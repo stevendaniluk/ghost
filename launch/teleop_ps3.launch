@@ -1,0 +1,22 @@
+<!-- Launcher for sending CarControl commands via a PS3 controller -->
+
+<launch>
+  
+  <!-- Node for converting joy messages to CarControl messages -->
+  <node
+    pkg="ghost"
+    type="teleop_ps3"
+    name="teleop_ps3_node"
+    output="screen"
+    ns="GhostController"
+  />
+  
+  <!-- Node for reading inputs from PS3 controller -->
+  <node 
+    pkg="joy" 
+    type="joy_node" 
+    name="joystick"
+    ns="GhostController"
+  />
+  
+</launch>

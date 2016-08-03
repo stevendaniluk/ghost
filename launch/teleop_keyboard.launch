@@ -1,0 +1,14 @@
+<!-- Launcher for sending CarControl commands via a keyboard inputs -->
+
+<launch>
+  
+  <!-- Node for converting key presses to CarControl messages -->
+  <node
+    pkg="ghost"
+    type="teleop_keyboard"
+    name="teleop_keyboard_node"
+    output="screen"
+    ns="GhostController"
+  />
+  
+</launch>

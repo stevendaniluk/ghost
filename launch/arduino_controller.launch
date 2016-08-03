@@ -1,0 +1,33 @@
+<!-- Launcher for arduino microcontroller with rosserial-->
+
+<launch>
+  
+  <!-- Load the controller parameters -->
+  <rosparam 
+      file="$(find ghost)/param/ghost_controller.yaml" 
+      command="load" 
+  />
+  
+  <!-- Node for converter CarControl messages to ServoControl messages -->
+  <node
+    pkg="ghost"
+    type="car_to_servo_converter"
+    name="car_to_servo_converter_node"
+    ns="GhostController"
+  />
+  
+  <!-- rosserial node 
+     
+     Argument sets serial port
+        Android Uno:  /dev/ttyACM0
+        Android Nano: /dev/ttyUSB0
+  -->
+  <node
+    pkg="rosserial_python"
+    type="serial_node.py"
+    name="arduino_serial"
+    args="/dev/ttyUSB0"
+    ns="GhostController"
+  />
+  
+</launch>

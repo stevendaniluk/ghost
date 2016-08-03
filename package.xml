@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package>
+  <name>ghost</name>
+  <version>0.0.0</version>
+  <description>The Ghost package</description>
+
+  <maintainer email="stevendaniluk8@gmail.com">Steven Daniluk</maintainer>
+  <license>BSD</license>
+  <author email="stevendaniluk8@gmail.com">Steven Daniluk</author>
+  
+  <!-- Build Tool Dependencies -->
+  <buildtool_depend>catkin</buildtool_depend>
+  
+  <!-- Build Dependencies -->
+  <build_depend>roscpp</build_depend>
+  <build_depend>message_generation</build_depend>
+  
+  <!-- Run Time Dependencies -->
+  <run_depend>roscpp</run_depend>
+  <run_depend>message_generation</run_depend>
+  <run_depend>message_runtime</run_depend>
+  
+</package>

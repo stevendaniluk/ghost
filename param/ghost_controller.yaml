@@ -1,0 +1,13 @@
+# Paremeter settings for Ghost Controller
+
+GhostController:
+
+# Servo Parameters
+  steering_centre_pwm: 100
+  throttle_centre_pwm: 89
+  throttle_max_pwm: 135
+  pwm_per_degree: 1
+  
+# Car Parameters
+  vel_max: 15.0
+  max_steering_angle: 40.0
