@@ -1,0 +1,34 @@
+<!-- Simple launch file for RealSense R200 camera -->
+<launch>
+
+    <arg name="camera"       value="camera" />
+    
+    <param name="$(arg camera)/enable_depth"      type="bool" value="false" />
+    <param name="$(arg camera)/enable_color"      type="bool" value="true" />
+    <param name="$(arg camera)/enable_pointcloud" type="bool" value="false" />
+    <param name="$(arg camera)/enable_tf"         type="bool" value="true" />
+    <param name="$(arg camera)/mode"              type="str"  value="manual" />
+    <param name="$(arg camera)/depth_width"       type="int"  value="640" />
+    <param name="$(arg camera)/depth_height"      type="int"  value="480" />
+    <param name="$(arg camera)/color_width"       type="int"  value="1920" />
+    <param name="$(arg camera)/color_height"      type="int"  value="1080" />
+    <param name="$(arg camera)/depth_fps"         type="int"  value="30" />
+    <param name="$(arg camera)/color_fps"         type="int"  value="30" />
+
+  <node 
+    pkg="nodelet" 
+    type="nodelet" 
+    name="nodelet_manager" 
+    args="manager" 
+    output="screen"
+  />
+
+  <include file="$(find realsense_camera)/launch/includes/nodelet.launch.xml">
+    <arg name="manager"      value="nodelet_manager" />
+    <arg name="camera"       value="camera" />
+    <arg name="camera_type"  value="R200" />
+    <arg name="serial_no"    value="" />
+    <arg name="usb_port_id"  value="" /> <!-- USB "Bus#-Port#" -->
+  </include>
+
+</launch>

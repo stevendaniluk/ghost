@@ -1,0 +1,7 @@
+# Contents of bagfiles
+bagfiles/*
+!bagfiles/placeholder.txt
+
+# Contents of training_images
+training_images/*
+!training_images/placeholder.txt
