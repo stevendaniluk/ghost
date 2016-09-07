@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <termios.h>
 #include <stdio.h>
+#include <algorithm>
 #include <ghost/CarControl.h>
 
 #define KEYCODE_R 0x43 
@@ -16,6 +17,8 @@
 #define KEYCODE_D 0x42
 #define KEYCODE_S 0x20
 #define KEYCODE_Q 0x71
+#define KEYCODE_A 0x61
+#define KEYCODE_NULL 0x00
 
 //------------------------------------
 
@@ -25,8 +28,8 @@ class Teleop {
     void keyLoop();
     
     // For holding loaded parameters
-    double vel_max_;
-    double max_steering_angle_;
+    float vel_max_;
+    float max_steering_angle_;
     
     // Message to be published
     ghost::CarControl msg;
@@ -40,8 +43,8 @@ class Teleop {
 // Constructor
 Teleop::Teleop() {
   // Get relevant parameters
-  nh_.param("vel_max", vel_max_, 10.0);
-  nh_.param("max_steering_angle", max_steering_angle_, 40.0);
+  nh_.param("vel_max", vel_max_, 10.0f);
+  nh_.param("max_steering_angle", max_steering_angle_, 40.0f);
   
   // Setup publisher
   car_control_pub_ = nh_.advertise<ghost::CarControl>("cmd_car", 1, true);
@@ -56,10 +59,11 @@ void Teleop::keyLoop() {
   char key;
   bool unknown_key = false;
   
-  int steering_angle = 0;
+  float steering_angle = 0;
   float velocity = 0;
+  float current_vel_max = vel_max_;
 
-  // get the console in raw mode                          
+  // Get the console in raw mode                          
   tcgetattr(kfd, &cooked);
   memcpy(&raw, &cooked, sizeof(struct termios));
   raw.c_lflag &=~ (ICANON | ECHO);
@@ -69,31 +73,63 @@ void Teleop::keyLoop() {
   raw.c_cc[VEOF] = 2;
   tcsetattr(kfd, TCSANOW, &raw);
   
+  // Set timeout for reading keystrokes
+  struct timeval timeout;
+  timeout.tv_sec = 0.01;
+  timeout.tv_usec = 0;
+  
   puts(" ");
   puts("---------------------------");
   puts("Reading from keyboard");
   puts("Use arrow keys to move the car.");
   puts(" ");
-  puts("Up Arrow = Increase Speed");
-  puts("Down Arrow = Decrease Speed");
+  puts("Up Arrow = Increase Velocity");
+  puts("Down Arrow = Decrease Velocity");
   puts("Left Arrow = Increment Steering Angle Left");
   puts("Right Arrow = Increment Steering Angle Right");
-
-  for(;;) {
-    // Get the next event from the keyboard  
-    if(read(kfd, &key, 1) < 0) {
-      perror("read():");
-      exit(-1);
+  puts("Space Bar = Set Velocity To Zero");
+  puts("Q = Increase Max Velocity By 0.2m/s");
+  puts("A = Decrease Max Velocity By 0.2m/s");
+  puts(" ");
+  
+  // Set precision for printing max velocity
+  std::cout.setf(std::ios::fixed, std::ios::floatfield);
+  std::cout.precision(2);
+  
+  // Variables for controlling publish rate
+  float pub_rate = 20;
+  ros::Time prev_pub_time = ros::Time::now();
+  
+  // Loop while reading key inputs
+  while(1) {
+    
+    // Initialize file descriptor sets (necessary for select method)
+    fd_set read_fds, write_fds, except_fds;
+    FD_ZERO(&read_fds);
+    FD_ZERO(&write_fds);
+    FD_ZERO(&except_fds);
+    FD_SET(kfd, &read_fds);
+    
+    // Wait for input to become ready or until the time out
+    if (select(kfd + 1, &read_fds, &write_fds, &except_fds, &timeout) == 1) {
+      // kfd is ready for reading
+      if(read(kfd, &key, 1) < 1) {
+        perror("read():");
+        exit(-1);
+      }
+    } else {
+      // Timeout
+      key = KEYCODE_NULL;
     }
-
+    
     ROS_DEBUG("value: 0x%02X\n", key);
     unknown_key = false;
     switch(key) {
       case KEYCODE_L:
-        steering_angle -= 2;
+        steering_angle -= 3;
         break;
       case KEYCODE_R:
-        steering_angle += 2;
+        steering_angle += 3;
         break;
       case KEYCODE_U:
         velocity += 0.5;
@@ -104,34 +140,47 @@ void Teleop::keyLoop() {
       case KEYCODE_S:
   	velocity = 0;
         break;
+      case KEYCODE_Q:
+        current_vel_max += 0.2;
+        current_vel_max = std::min(current_vel_max, vel_max_);
+        std::cout << "Max Velocity=" << current_vel_max << std::endl;
+        break;
+      case KEYCODE_A:
+        current_vel_max -= 0.2;
+        current_vel_max = std::max(current_vel_max, 0.0f);
+        std::cout << "Max Velocity=" << current_vel_max << std::endl;
+        break;
       default:
         unknown_key = true;
         break;
-    }
+    }// end switch
     
     // Only process known key inputs
-      if (!unknown_key) {
+    if (!unknown_key) {
+      // Flush remaining inputs in queue
+      tcflush(kfd, TCIFLUSH);
+      
       // Make sure steering is within bounds
-      if (steering_angle > max_steering_angle_) {
-        steering_angle = max_steering_angle_;
-      } else if (steering_angle < -max_steering_angle_) {
-        steering_angle = -max_steering_angle_;
-      }// end angle if
+      steering_angle = std::min(steering_angle, max_steering_angle_);
+      steering_angle = std::max(steering_angle, -max_steering_angle_);
       
       // Make sure velocity is within bounds
-      if (velocity > vel_max_) {
-        velocity = vel_max_;
-      } else if (velocity < 0) {
-        velocity = 0;
-      }// end if
+      velocity = std::min(velocity, current_vel_max);
+      velocity = std::max(velocity, 0.0f);
       
-      // Publish the message
       msg.steering_angle = steering_angle;
       msg.velocity = velocity;
-      car_control_pub_.publish(msg);
     }// end unknown_key if
-
-  }// end for
+    
+    // Publish at desired frequency
+    if (ros::Time::now() > (prev_pub_time + ros::Duration(1/pub_rate))) {
+      prev_pub_time = ros::Time::now();
+      msg.header.stamp = ros::Time::now();
+      car_control_pub_.publish(msg);
+      ROS_DEBUG("Vel=%.2f, Angle=%.2f", velocity, steering_angle);
+    }
+    
+  }// end while
 
   return;
 }
@@ -158,6 +207,5 @@ int main(int argc, char** argv) {
   
   return(0);
 }
-
 
 

@@ -7,10 +7,10 @@
 */
 
 #include <ros/ros.h>
-#include "ros/console.h"
+#include <ros/console.h>
 #include <sensor_msgs/Joy.h>
-#include "boost/thread/mutex.hpp"
-#include "boost/thread/thread.hpp"
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 #include <ghost/CarControl.h>
 
 //------------------------------------
@@ -79,6 +79,7 @@ void Teleop::joyCallback(const sensor_msgs::Joy::ConstPtr& joy) {
 void Teleop::publish() {
   boost::mutex::scoped_lock lock(publish_mutex_);
   
+  msg_.header.stamp = ros::Time::now();
   if (msg_.velocity == 0 && msg_.acceleration == 0 && msg_.steering_angle == 0) {
     // Publish once zero message, then stop
     if (publish_once_) {
