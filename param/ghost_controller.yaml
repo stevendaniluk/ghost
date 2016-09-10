@@ -4,8 +4,11 @@ GhostController:
 
 # Servo Parameters
   steering_centre_pwm: 100
-  throttle_centre_pwm: 89
+  steering_max_pwm: 140
+  steering_min_pwm: 60
+  throttle_centre_pwm: 87
   throttle_max_pwm: 135
+  throttle_min_pwm: 53
   pwm_per_degree: 1
   
 # Car Parameters
