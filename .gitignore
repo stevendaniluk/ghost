@@ -2,6 +2,15 @@
 bagfiles/*
 !bagfiles/placeholder.txt
 
-# Contents of training_images
-training_images/*
-!training_images/placeholder.txt
+# Road classifier datasets and logs
+road_classifier/datasets/*
+!road_classifier/datasets/placeholder.txt
+
+road_classifier/logs/*
+!road_classifier/logs/placeholder.txt
+
+road_classifier/trained_models/*
+!road_classifier/trained_models/placeholder.txt
+
+# Python .pyc files
+*.pyc
