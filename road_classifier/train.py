@@ -11,6 +11,7 @@
 #   -IoU (Intersection over union)
 
 import os, os.path
+import scipy.misc
 import tensorflow as tf
 import data_loader as data
 import model as model
@@ -20,6 +21,7 @@ import parameters as params
 if tf.gfile.Exists(params.log_dir):
   tf.gfile.DeleteRecursively(params.log_dir)
 tf.gfile.MakeDirs(params.log_dir)
+tf.gfile.MakeDirs(params.log_dir + "/images")
 
 sess = tf.InteractiveSession()
 
@@ -85,6 +87,14 @@ for i in range(params.max_steps):
     train_writer.add_run_metadata(run_metadata, 'step%03d' % i)
     train_writer.add_summary(summary, i)
     print "Adding metadata for run {0}.".format(i)
+
+    # Save samples for validation images
+    xs, ys = data.LoadValBatch(params.batch_size)
+    predictions = sess.run(model.prediction, feed_dict={model.x: xs, model.y_: ys, model.keep_prob: 1.0, model.training:False})
+    for j in range(params.batch_size):
+      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "_raw.png"), xs[i])
+      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "._label.png"), ys[i])
+      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "._pred.png"), predictions[i])
   else:
     # Record a summary
     summary, loss, _ = sess.run([merged, cross_entropy, train_step], feed_dict={model.x: xs, model.y_: ys, model.keep_prob:params.dropout, model.training:True})
