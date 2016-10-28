@@ -86,15 +86,16 @@ for i in range(params.max_steps):
                           run_metadata=run_metadata)
     train_writer.add_run_metadata(run_metadata, 'step%03d' % i)
     train_writer.add_summary(summary, i)
-    print "Adding metadata for run {0}.".format(i)
+    print "Saved metadata for step {0}.".format(i)
 
     # Save samples for validation images
     xs, ys = data.LoadValBatch(params.batch_size)
     predictions = sess.run(model.prediction, feed_dict={model.x: xs, model.y_: ys, model.keep_prob: 1.0, model.training:False})
-    for j in range(params.batch_size):
-      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "_raw.png"), xs[i])
-      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "._label.png"), ys[i])
-      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "._pred.png"), predictions[i])
+    for j in range(len(predictions)):
+      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "_raw.png"), xs[j])
+      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "._label.png"), ys[j])
+      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "._pred.png"), predictions[j])
+    print "Saved sample images for step {0}.".format(i)
   else:
     # Record a summary
     summary, loss, _ = sess.run([merged, cross_entropy, train_step], feed_dict={model.x: xs, model.y_: ys, model.keep_prob:params.dropout, model.training:True})
