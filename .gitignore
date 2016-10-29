@@ -5,6 +5,7 @@ bagfiles/*
 # Road classifier datasets and logs
 road_classifier/datasets/*
 !road_classifier/datasets/placeholder.txt
+!road_classifier/datasets/bad_label_scanner.py
 
 road_classifier/logs/*
 !road_classifier/logs/placeholder.txt
