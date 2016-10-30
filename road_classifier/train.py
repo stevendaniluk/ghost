@@ -30,7 +30,7 @@ with tf.name_scope('cross_entropy'):
   num_positives = tf.maximum(tf.reduce_sum(tf.cast(model.y_, tf.int32)), 1)
   num_negatives = tf.sub(tf.size(model.y_), num_positives)
   class_ratio = tf.cast(num_negatives, tf.float32)/tf.cast(num_positives, tf.float32)
-  diff = tf.nn.weighted_cross_entropy_with_logits(model.y, tf.cast(model.y_, tf.float32), class_ratio)
+  diff = tf.nn.weighted_cross_entropy_with_logits(tf.clip_by_value(model.y, 1e-10, 1.0), tf.cast(model.y_, tf.float32), class_ratio)
   with tf.name_scope('total'):
     cross_entropy = tf.reduce_mean(diff)
   tf.scalar_summary('cross entropy', cross_entropy)
