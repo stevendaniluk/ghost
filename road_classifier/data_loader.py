@@ -88,11 +88,10 @@ val_y = y_img_names[-num_val_imgs:]
 
 print "Split into {0} training images, and {1} validation images.\n".format(num_train_imgs, num_val_imgs)
 
-# Function for cropping and resizing an image
-def resize_img(img):
+# Pre-processing for images (cropping, resizing, whitening, and type conversion)
+def process_img(img):
   # Get image dimensions
-  h_in, w_in, dims = np.atleast_3d(img).shape
-  is_rgb_img = (dims == 3)
+  h_in, w_in, channels = np.atleast_3d(img).shape
 
   # Make sure the original is larger than the new size
   if (w_in < params.res["width"] or h_in < params.res["height"]):
@@ -120,11 +119,23 @@ def resize_img(img):
     h_new = int(round(w_in/desired_ar))
     h_low = h_in - h_new
 
-  # Crop with indices
-  if is_rgb_img:
+  # Map to [0,1]
+  img = img/255.0
+
+  # Processing differs between 3-channel raw images and labels
+  if channels == 3:
+    # Crop
     img = img[h_low:h_high, w_low:w_high, :]
+    # Whiten (zero mean, and unit stddev)
+    mean = np.mean(img)
+    stddev = np.sqrt(np.var(img))
+    adjusted_stddev = max(stddev, 1.0/np.sqrt(img.size))
+    img = (img - mean)/adjusted_stddev
   else:
+    # Crop
     img = img[h_low:h_high, w_low:w_high]
+    # Convert to boolean
+    img = np.round(img).astype(bool)
 
   # Resize
   img = scipy.misc.imresize(img, [params.res["height"], params.res["width"]])
@@ -136,8 +147,8 @@ def LoadTrainBatch(batch_size):
     x_out = []
     y_out = []
     for i in range(0, batch_size):
-        x_out.append(resize_img(scipy.misc.imread(train_x[(train_batch_pointer + i) % num_train_imgs])) / 255.0)
-        y_out.append(np.round(resize_img(scipy.misc.imread(train_y[(train_batch_pointer + i) % num_train_imgs])) / 255.0).astype(bool))
+        x_out.append(process_img(scipy.misc.imread(train_x[(train_batch_pointer + i) % num_train_imgs])))
+        y_out.append(process_img(scipy.misc.imread(train_y[(train_batch_pointer + i) % num_train_imgs])))
         
     train_batch_pointer += batch_size
     return x_out, y_out
@@ -148,8 +159,8 @@ def LoadValBatch(batch_size):
     x_out = []
     y_out = []
     for i in range(0, batch_size):
-        x_out.append(resize_img(scipy.misc.imread(val_x[(val_batch_pointer + i) % num_val_imgs])) / 255.0)
-        y_out.append(np.round(resize_img(scipy.misc.imread(val_y[(val_batch_pointer + i) % num_val_imgs])) / 255.0).astype(bool))
+        x_out.append(process_img(scipy.misc.imread(val_x[(val_batch_pointer + i) % num_val_imgs])))
+        y_out.append(process_img(scipy.misc.imread(val_y[(val_batch_pointer + i) % num_val_imgs])))
 
     val_batch_pointer += batch_size
     return x_out, y_out
@@ -159,7 +170,7 @@ def LoadTestBatch(batch_size):
     global test_batch_pointer
     x_out = []
     for i in range(0, batch_size):
-        x_out.append(resize_img(scipy.misc.imread(test_img_names[(test_batch_pointer + i) % num_test_imgs])) / 255.0)
+        x_out.append(process_img(scipy.misc.imread(test_img_names[(test_batch_pointer + i) % num_test_imgs])))
         
     test_batch_pointer += batch_size
     return x_out
