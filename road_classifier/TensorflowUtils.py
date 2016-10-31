@@ -68,7 +68,7 @@ def batch_norm(inputT, is_training=True, scope=None):
   	             lambda: tf.contrib.layers.batch_norm(inputT, is_training=False, updates_collections=None, center=False, scope=scope, reuse = True))
 
 # Bottleneck unit
-def bottleneck(x, k, rate, training, name=None, summaries=False):
+def bottleneck(x, k, rate=1, training=True, batch_norm=False, name=None, summaries=False):
 	"""
 	Bottleneck unit consists of the following layers:
 	  -1x1 convolution to reduce dimensionality (halfed)
@@ -138,7 +138,10 @@ def bottleneck(x, k, rate, training, name=None, summaries=False):
 
 	# Normalization
 	with tf.variable_scope(name + "/norm") as scope:
-		b4 = batch_norm(b3, is_training=training, scope=scope)
+		if batch_norm:
+		  b4 = batch_norm(b3, is_training=training, scope=scope)
+		else:
+			b4 = b3
 
 	with tf.name_scope('out'):
 	  out = tf.add(x, b4)

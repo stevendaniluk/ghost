@@ -5,7 +5,8 @@ import numpy as np
 import tensorflow as tf
 import data_loader as data
 import parameters as params
-import model as model
+import enet_simple as model
+import time
 
 sess = tf.InteractiveSession()
 saver = tf.train.Saver()
@@ -17,11 +18,13 @@ img, label = data.LoadValBatch(num_imgs)
 #img = data.LoadTestBatch(num_imgs)
 
 for i in range(num_imgs):
-	# Get prediciton
+  # Get prediciton
+  start_time = time.time()
   mask = model.prediction.eval(feed_dict={model.x: [img[i]], model.keep_prob: 1.0, model.training:False})
-  mask = tf.reshape(mask, [params.res["height"], params.res["width"]]).eval()
+  print("--- %s seconds ---" % (time.time() - start_time))
+  mask = 255.0*tf.reshape(mask, [params.res["height"], params.res["width"]]).eval()
 
   # Tile raw, label, and predicted images
-  combo_img = np.concatenate((img[i], np.tile(np.atleast_3d(label[i]), [1,1,3]), np.tile(np.atleast_3d(mask), [1,1,3])), axis=1)
+  combo_img = np.concatenate((img[i], np.tile(np.atleast_3d(label[i]), [1,1,3]), np.tile(np.atleast_3d(mask), [1,1,3])), axis=0)
   scipy.misc.imshow(combo_img)
   
