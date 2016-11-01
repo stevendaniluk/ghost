@@ -24,11 +24,28 @@ train_batch_pointer = 0
 val_batch_pointer = 0
 test_batch_pointer = 0
 
+train_dataset_num = 0
+val_dataset_num = 0
+test_dataset_num = 0
+
 valid_images = [".jpg", ".png"]
 
+# Temporary lists for getting image names
 x_img_names = [] 
 y_img_names = []
 test_img_names = []
+
+# Full lists of image names
+train_x = []
+train_y = []
+val_x = []
+val_y = []
+test = []
+
+# List of sizes for each dataset
+train_set_sizes = []
+val_set_sizes = []
+test_set_sizes = []
 
 for name in params.datasets:
   print "Scanning dataset: {0}".format(name)
@@ -52,6 +69,25 @@ for name in params.datasets:
     else:
       print "No label found for {0}. Will be ignored.".format(label_name)
 
+  # Find split size for this set
+  set_num_raws = len(x_img_names)
+  set_num_train_imgs = int(math.ceil(set_num_raws * params.train_frac))
+  set_num_val_imgs = int(math.floor(set_num_raws * params.val_frac))
+
+  # Record set sizes
+  train_set_sizes.append(set_num_train_imgs)
+  val_set_sizes.append(set_num_val_imgs)
+
+  # Add to image lists
+  train_x += x_img_names[:set_num_train_imgs]
+  train_y += y_img_names[:set_num_train_imgs]
+  val_x += x_img_names[-set_num_val_imgs:]
+  val_y += y_img_names[-set_num_val_imgs:]
+
+  # Clear for next loop
+  x_img_names = []
+  y_img_names = []
+
   # Get the name of all test images in the folder
   if os.path.exists(test_path):
     for name in os.listdir(test_path):
@@ -62,29 +98,26 @@ for name in params.datasets:
       # Check for the labeled image
       test_img_names.append(os.path.join(test_path, name))
 
-num_raws = len(x_img_names)
-num_labels = len(y_img_names)
-num_test_imgs = len(test_img_names)
+  if len(test_img_names) > 0:
+    # Record the set sizes
+    test_set_sizes.append(len(test_img_names))
+    # Add to image list
+    test += test_img_names
+    # Clear for next loop
+    test_img_names = []
+
+# Get total image numbers to print
+num_raws = len(train_x) + len(val_x)
+num_labels = len(train_y) + len(val_y)
+num_test_imgs = len(test)
+num_train_imgs = len(train_x)
+num_val_imgs = len(val_x)
 
 # Error checking
 if num_raws != num_labels:
   print "WARNING: Number of raw and labeled images do not match. {0} raws, and {1} labels found".format(num_raws, num_labels)
 
 print "Found {0} images with labels, and {1} unlabeled test images.".format(num_raws, num_test_imgs)
-
-# Shuffle the list of images
-c = list(zip(x_img_names, y_img_names))
-random.shuffle(c)
-x_img_names, y_img_names = zip(*c)
-
-# Split into training and validation sets
-num_train_imgs = int(math.ceil(num_raws * params.train_frac))
-num_val_imgs = int(math.floor(num_raws * params.val_frac))
-
-train_x = x_img_names[:num_train_imgs]
-train_y = y_img_names[:num_train_imgs]
-val_x = x_img_names[-num_val_imgs:]
-val_y = y_img_names[-num_val_imgs:]
 
 print "Split into {0} training images, and {1} validation images.\n".format(num_train_imgs, num_val_imgs)
 
@@ -142,35 +175,54 @@ def process_img(img):
   return img
 
 # Function for getting training images
-def LoadTrainBatch(batch_size):
-    global train_batch_pointer
-    x_out = []
-    y_out = []
-    for i in range(0, batch_size):
-        x_out.append(process_img(scipy.misc.imread(train_x[(train_batch_pointer + i) % num_train_imgs])))
-        y_out.append(process_img(scipy.misc.imread(train_y[(train_batch_pointer + i) % num_train_imgs])))
-        
-    train_batch_pointer += batch_size
-    return x_out, y_out
+def LoadTrainBatch():
+  global train_batch_pointer
+  global train_dataset_num
+
+  x_out = []
+  y_out = []
+  x_out.append(process_img(scipy.misc.imread(train_x[train_batch_pointer % num_train_imgs])))
+  y_out.append(process_img(scipy.misc.imread(train_y[train_batch_pointer % num_train_imgs])))
+  
+  train_batch_pointer += 1
+
+  # Reset the dataset number
+  if train_batch_pointer % train_set_sizes[train_dataset_num] == 0:
+    train_dataset_num = (train_dataset_num + 1) % len(train_set_sizes)
+
+  return x_out, y_out
 
 # Function for getting validation images
-def LoadValBatch(batch_size):
-    global val_batch_pointer
-    x_out = []
-    y_out = []
-    for i in range(0, batch_size):
-        x_out.append(process_img(scipy.misc.imread(val_x[(val_batch_pointer + i) % num_val_imgs])))
-        y_out.append(process_img(scipy.misc.imread(val_y[(val_batch_pointer + i) % num_val_imgs])))
+def LoadValBatch():
+  global val_batch_pointer
+  global val_dataset_num
 
-    val_batch_pointer += batch_size
-    return x_out, y_out
+  x_out = []
+  y_out = []
+  
+  x_out.append(process_img(scipy.misc.imread(val_x[val_batch_pointer % num_val_imgs])))
+  y_out.append(process_img(scipy.misc.imread(val_y[val_batch_pointer % num_val_imgs])))
+
+  val_batch_pointer += 1
+
+  # Reset the dataset number
+  if val_batch_pointer % val_set_sizes[val_dataset_num] == 0:
+    val_dataset_num = (val_dataset_num + 1) % len(val_set_sizes)
+
+  return x_out, y_out
 
 # Function for getting testing images
-def LoadTestBatch(batch_size):
-    global test_batch_pointer
-    x_out = []
-    for i in range(0, batch_size):
-        x_out.append(process_img(scipy.misc.imread(test_img_names[(test_batch_pointer + i) % num_test_imgs])))
-        
-    test_batch_pointer += batch_size
-    return x_out
+def LoadTestBatch():
+  global test_batch_pointer
+  global test_dataset_num
+
+  x_out = []
+  x_out.append(process_img(scipy.misc.imread(test[test_batch_pointer % num_test_imgs])))
+      
+  test_batch_pointer += 1
+
+  # Reset the dataset number
+  if test_batch_pointer % test_set_sizes[test_dataset_num] == 0:
+    test_dataset_num = (test_dataset_num + 1) % len(test_set_sizes)
+
+  return x_out
