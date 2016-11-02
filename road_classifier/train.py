@@ -12,6 +12,7 @@
 
 import os, os.path
 import scipy.misc
+import numpy as np
 import tensorflow as tf
 import data_loader as data
 import model as model
@@ -62,56 +63,66 @@ with tf.name_scope('prediction_stats') as scope:
 # Merge all the summaries and write them out
 merged = tf.merge_all_summaries()
 train_writer = tf.train.SummaryWriter(params.log_dir + '/train', sess.graph)
-val_writer = tf.train.SummaryWriter(params.log_dir + '/val')
 
 print "Initializing variables."
 tf.initialize_all_variables().run()
 saver = tf.train.Saver()
 
+# Initialize previous prediction
+prev_prediction = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
+prev_label = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
+
+# Set initial dataset
+train_dataset_num = data.train_dataset_num
+
 # Train the model, and also write summaries.
-# Every X step, measure validation-set accuracy, and write validation summaries
-# All other steps, run train_step on training data, and add training summaries
+# Every 100th step save meta data
 print "Beginning training (max {0} steps).".format(params.max_steps)
 for i in range(params.max_steps):
   # Get training data
-  xs, ys = data.LoadTrainBatch(params.batch_size)
+  xs, ys = data.LoadTrainBatch()
+
+  # If datasets have changed, the previous predicition must be randomized
+  if train_dataset_num != data.train_dataset_num:
+    train_dataset_num = data.train_dataset_num
+    prev_prediction = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
+    prev_label = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
+    print "New dataset."
 
   if i % 100 == 99:
     # Record execution stats 
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     run_metadata = tf.RunMetadata()
-    summary, loss, _ = sess.run([merged, cross_entropy, train_step],
-                          feed_dict={model.x: xs, model.y_: ys, model.keep_prob: 1.0, model.training:True},
-                          options=run_options,
-                          run_metadata=run_metadata)
+    
+    feed_dict = {model.x: xs, model.y_: ys, model.prev_y:prev_prediction, model.keep_prob: 1.0, model.training:True}
+    summary, loss, _ = sess.run([merged, cross_entropy, train_step], feed_dict=feed_dict, options=run_options, run_metadata=run_metadata)
+    
     train_writer.add_run_metadata(run_metadata, 'step%03d' % i)
     train_writer.add_summary(summary, i)
     print "Saved metadata for step {0}.".format(i)
-
-    # Save samples for validation images
-    xs, ys = data.LoadValBatch(params.batch_size)
-    predictions = sess.run(model.prediction, feed_dict={model.x: xs, model.y_: ys, model.keep_prob: 1.0, model.training:False})
-    for j in range(len(predictions)):
-      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "_raw.png"), xs[j])
-      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "._label.png"), ys[j])
-      scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_img_" + str(j) + "._pred.png"), predictions[j])
-    print "Saved sample images for step {0}.".format(i)
   else:
     # Record a summary
-    summary, loss, _ = sess.run([merged, cross_entropy, train_step], feed_dict={model.x: xs, model.y_: ys, model.keep_prob:params.dropout, model.training:True})
+    feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:params.dropout, model.training:True}
+    summary, loss, _ = sess.run([merged, cross_entropy, train_step], feed_dict=feed_dict)
     train_writer.add_summary(summary, i)
-  
+
   print "Training step {0} loss:{1:.3f}".format(i, loss)
 
-  if (i % 20 == 0):
-    # Measure validation set accuracy
-    xs, ys = data.LoadValBatch(params.batch_size)
-    summary, acc = sess.run([merged, accuracy], feed_dict={model.x: xs, model.y_: ys, model.keep_prob: 1.0, model.training:False})
-    val_writer.add_summary(summary, i)
-    print "Validation accuracy: {0:.3f}".format(acc)
+  # Get the prediction for next step
+  feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:1.0, model.training:False}
+  prev_prediction = sess.run(model.prediction, feed_dict=feed_dict)
+  
+  # save the label for the next step
+  prev_label = ys
+
+  # Save sample predictions
+  if i % 20 == 19:
+    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_raw.png"), xs[0])
+    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "._label.png"), ys[0])
+    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "._pred.png"), prev_prediction[0])
+    print "Saved sample images."
 
 train_writer.close()
-val_writer.close()
 print "Training complete." 
 
 if (params.save_model):

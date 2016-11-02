@@ -79,6 +79,8 @@ for name in params.datasets:
   val_set_sizes.append(set_num_val_imgs)
 
   # Add to image lists
+  x_img_names = sorted(x_img_names, key=str.lower)
+  y_img_names = sorted(y_img_names, key=str.lower)
   train_x += x_img_names[:set_num_train_imgs]
   train_y += y_img_names[:set_num_train_imgs]
   val_x += x_img_names[-set_num_val_imgs:]
@@ -102,6 +104,7 @@ for name in params.datasets:
     # Record the set sizes
     test_set_sizes.append(len(test_img_names))
     # Add to image list
+    test_img_names = sorted(test_img_names, key=str.lower)
     test += test_img_names
     # Clear for next loop
     test_img_names = []
@@ -199,7 +202,6 @@ def LoadValBatch():
 
   x_out = []
   y_out = []
-  
   x_out.append(process_img(scipy.misc.imread(val_x[val_batch_pointer % num_val_imgs])))
   y_out.append(process_img(scipy.misc.imread(val_y[val_batch_pointer % num_val_imgs])))
 
