@@ -5,9 +5,12 @@ project(ghost)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  std_msgs
+  cv_bridge
+  image_transport
   message_generation
+  roscpp
+  sensor_msgs
+  std_msgs
 )
 
 # Declare custom messages
@@ -42,6 +45,7 @@ include_directories(
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)
 add_executable(teleop_ps3 src/teleop_ps3.cpp)
 add_executable(car_to_servo_converter src/car_to_servo_converter.cpp)
+add_executable(camera_frame_grabber src/camera_frame_grabber.cpp)
 
 # Declare the dependencies
 add_dependencies(teleop_keyboard ghost_generate_messages_cpp)
@@ -52,6 +56,7 @@ add_dependencies(car_to_servo_converter ghost_generate_messages_cpp)
 target_link_libraries(teleop_keyboard ${catkin_LIBRARIES})
 target_link_libraries(teleop_ps3 ${catkin_LIBRARIES})
 target_link_libraries(car_to_servo_converter ${catkin_LIBRARIES})
+target_link_libraries(camera_frame_grabber ${catkin_LIBRARIES})
 
 # Declare a C++ library
 # add_library(foo src/${PROJECT_NAME}/foo.cpp
