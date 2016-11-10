@@ -6,11 +6,13 @@
 #   -labels
 #   -test (not required)
 #
-# All of the raw images with labels are randomly shuffled, then split into training
-# and validation sets according to the ratios in parameters.py.
+# All of the raw images with labels are arranged into ordered lists, as well as 
+# a randomly shuffled list, then split into training and validation sets 
+# according to the ratios in parameters.py.
 #
 # LoadTrainBatch, LoadValBatch, and LoadTestBatch provide the interface to fetch 
-# images for training or testing.
+# images for training or testing in a random order. LoadOrderedTrainBatch, 
+# LoadOrderedValBatch, and LoadOrderedTestBatch are for getting sequential images.
 
 import os, os.path
 import random
@@ -20,9 +22,12 @@ import parameters as params
 import numpy as np
 
 # Pointers for the end of the last batch
-train_batch_pointer = 0
-val_batch_pointer = 0
-test_batch_pointer = 0
+train_batch_pointer_random = 0
+val_batch_pointer_random = 0
+test_batch_pointer_random = 0
+train_batch_pointer_ordered = 0
+val_batch_pointer_ordered = 0
+test_batch_pointer_ordered = 0
 
 train_dataset_num = 0
 val_dataset_num = 0
@@ -35,12 +40,19 @@ x_img_names = []
 y_img_names = []
 test_img_names = []
 
-# Full lists of image names
-train_x = []
-train_y = []
-val_x = []
-val_y = []
-test = []
+# Full lists of image names (randomized)
+train_x_random = []
+train_y_random = []
+val_x_random = []
+val_y_random = []
+test_random = []
+
+# Full lists of image names (ordered)
+train_x_ordered = []
+train_y_ordered = []
+val_x_ordered = []
+val_y_ordered = []
+test_ordered = []
 
 # List of sizes for each dataset
 train_set_sizes = []
@@ -81,10 +93,10 @@ for name in params.datasets:
   # Add to image lists
   x_img_names = sorted(x_img_names, key=str.lower)
   y_img_names = sorted(y_img_names, key=str.lower)
-  train_x += x_img_names[:set_num_train_imgs]
-  train_y += y_img_names[:set_num_train_imgs]
-  val_x += x_img_names[-set_num_val_imgs:]
-  val_y += y_img_names[-set_num_val_imgs:]
+  train_x_ordered += x_img_names[:set_num_train_imgs]
+  train_y_ordered += y_img_names[:set_num_train_imgs]
+  val_x_ordered += x_img_names[-set_num_val_imgs:]
+  val_y_ordered += y_img_names[-set_num_val_imgs:]
 
   # Clear for next loop
   x_img_names = []
@@ -105,24 +117,37 @@ for name in params.datasets:
     test_set_sizes.append(len(test_img_names))
     # Add to image list
     test_img_names = sorted(test_img_names, key=str.lower)
-    test += test_img_names
+    test_ordered += test_img_names
     # Clear for next loop
     test_img_names = []
 
 # Get total image numbers to print
-num_raws = len(train_x) + len(val_x)
-num_labels = len(train_y) + len(val_y)
-num_test_imgs = len(test)
-num_train_imgs = len(train_x)
-num_val_imgs = len(val_x)
+num_raws = len(train_x_ordered) + len(val_x_ordered)
+num_labels = len(train_y_ordered) + len(val_y_ordered)
+num_test_imgs = len(test_ordered)
+num_train_imgs = len(train_x_ordered)
+num_val_imgs = len(val_x_ordered)
+
+# Shuffle the list of images for randomized lists
+c = list(zip(train_x_ordered, train_y_ordered))
+random.shuffle(c)
+train_x_random, train_y_random = zip(*c)
+
+c = list(zip(val_x_ordered, val_y_ordered))
+random.shuffle(c)
+val_x_random, val_y_random = zip(*c)
+
+test_random = test_ordered[:]
+random.shuffle(test_random)
 
 # Error checking
 if num_raws != num_labels:
   print "WARNING: Number of raw and labeled images do not match. {0} raws, and {1} labels found".format(num_raws, num_labels)
 
 print "Found {0} images with labels, and {1} unlabeled test images.".format(num_raws, num_test_imgs)
-
 print "Split into {0} training images, and {1} validation images.\n".format(num_train_imgs, num_val_imgs)
+
+####################################
 
 # Pre-processing for images (cropping, resizing, whitening, and type conversion)
 def process_img(img):
@@ -177,54 +202,94 @@ def process_img(img):
   img = scipy.misc.imresize(img, [params.res["height"], params.res["width"]])
   return img
 
-# Function for getting training images
-def LoadTrainBatch():
-  global train_batch_pointer
+####################################
+
+# Function for getting randomized training images
+def LoadTrainBatch(batch_size):
+  global train_batch_pointer_random
+  x_out = []
+  y_out = []
+  for i in range(0, batch_size):
+      x_out.append(process_img(scipy.misc.imread(train_x_random[(train_batch_pointer_random + i) % num_train_imgs])))
+      y_out.append(process_img(scipy.misc.imread(train_y_random[(train_batch_pointer_random + i) % num_train_imgs])))
+      
+  train_batch_pointer_random += batch_size
+  return x_out, y_out
+
+# Function for getting sequential training images
+def LoadOrderedTrainBatch():
+  global train_batch_pointer_ordered
   global train_dataset_num
 
   x_out = []
   y_out = []
-  x_out.append(process_img(scipy.misc.imread(train_x[train_batch_pointer % num_train_imgs])))
-  y_out.append(process_img(scipy.misc.imread(train_y[train_batch_pointer % num_train_imgs])))
+  x_out.append(process_img(scipy.misc.imread(train_x_ordered[train_batch_pointer_ordered % num_train_imgs])))
+  y_out.append(process_img(scipy.misc.imread(train_y_ordered[train_batch_pointer_ordered % num_train_imgs])))
   
-  train_batch_pointer += 1
+  train_batch_pointer_ordered += 1
 
   # Reset the dataset number
-  if train_batch_pointer % train_set_sizes[train_dataset_num] == 0:
+  if train_batch_pointer_ordered % train_set_sizes[train_dataset_num] == 0:
     train_dataset_num = (train_dataset_num + 1) % len(train_set_sizes)
 
   return x_out, y_out
 
-# Function for getting validation images
-def LoadValBatch():
-  global val_batch_pointer
+####################################
+
+# Function for getting randomized validation images
+def LoadValBatch(batch_size):
+  global val_batch_pointer_random
+  x_out = []
+  y_out = []
+  for i in range(0, batch_size):
+      x_out.append(process_img(scipy.misc.imread(val_x_random[(val_batch_pointer_random + i) % num_val_imgs])))
+      y_out.append(process_img(scipy.misc.imread(val_y_random[(val_batch_pointer_random + i) % num_val_imgs])))
+
+  val_batch_pointer_random += batch_size
+  return x_out, y_out
+
+# Function for getting sequential validation images
+def LoadOrderedValBatch():
+  global val_batch_pointer_ordered
   global val_dataset_num
 
   x_out = []
   y_out = []
-  x_out.append(process_img(scipy.misc.imread(val_x[val_batch_pointer % num_val_imgs])))
-  y_out.append(process_img(scipy.misc.imread(val_y[val_batch_pointer % num_val_imgs])))
+  x_out.append(process_img(scipy.misc.imread(val_x_ordered[val_batch_pointer_ordered % num_val_imgs])))
+  y_out.append(process_img(scipy.misc.imread(val_y_ordered[val_batch_pointer_ordered % num_val_imgs])))
 
-  val_batch_pointer += 1
+  val_batch_pointer_ordered += 1
 
   # Reset the dataset number
-  if val_batch_pointer % val_set_sizes[val_dataset_num] == 0:
+  if val_batch_pointer_ordered % val_set_sizes[val_dataset_num] == 0:
     val_dataset_num = (val_dataset_num + 1) % len(val_set_sizes)
 
   return x_out, y_out
 
-# Function for getting testing images
-def LoadTestBatch():
-  global test_batch_pointer
+####################################
+
+# Function for getting randomized testing images
+def LoadTestBatch(batch_size):
+  global test_batch_pointer_random
+  x_out = []
+  for i in range(0, batch_size):
+      x_out.append(process_img(scipy.misc.imread(test_random[(test_batch_pointer_random + i) % num_test_imgs])))
+      
+  test_batch_pointer_random += batch_size
+  return x_out
+
+# Function for getting dsquential testing images
+def LoadOrderedTestBatch():
+  global test_batch_pointer_ordered
   global test_dataset_num
 
   x_out = []
-  x_out.append(process_img(scipy.misc.imread(test[test_batch_pointer % num_test_imgs])))
+  x_out.append(process_img(scipy.misc.imread(test_ordered[test_batch_pointer_ordered % num_test_imgs])))
       
-  test_batch_pointer += 1
+  test_batch_pointer_ordered += 1
 
   # Reset the dataset number
-  if test_batch_pointer % test_set_sizes[test_dataset_num] == 0:
+  if test_batch_pointer_ordered % test_set_sizes[test_dataset_num] == 0:
     test_dataset_num = (test_dataset_num + 1) % len(test_set_sizes)
 
   return x_out
