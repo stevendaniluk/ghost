@@ -1,5 +1,7 @@
 # Loads all data for training and testing the road classifier model
 #
+# Raw images are converted to greyscale, while labels are converted to boolean.
+#
 # Scans the dataset folders set in parameters.py for raw, labeled, and test images.
 # In each dataset folder the images must be in the following named folders:
 #   -raw
@@ -150,7 +152,7 @@ print "Split into {0} training images, and {1} validation images.\n".format(num_
 ####################################
 
 # Pre-processing for images (cropping, resizing, whitening, and type conversion)
-def process_img(img):
+def process_img(img, label):
   # Get image dimensions
   h_in, w_in, channels = np.atleast_3d(img).shape
 
@@ -180,26 +182,24 @@ def process_img(img):
     h_new = int(round(w_in/desired_ar))
     h_low = h_in - h_new
 
-  # Map to [0,1]
-  img = img/255.0
+  # Crop
+  img = img[h_low:h_high, w_low:w_high]
+
+  # Resize
+  img = scipy.misc.imresize(img, [params.res["height"], params.res["width"]])
 
   # Processing differs between 3-channel raw images and labels
-  if channels == 3:
-    # Crop
-    img = img[h_low:h_high, w_low:w_high, :]
+  if label:    
+    # Convert to boolean
+    img = np.round(img).astype(bool)
+  else:
     # Whiten (zero mean, and unit stddev)
     mean = np.mean(img)
     stddev = np.sqrt(np.var(img))
     adjusted_stddev = max(stddev, 1.0/np.sqrt(img.size))
     img = (img - mean)/adjusted_stddev
-  else:
-    # Crop
-    img = img[h_low:h_high, w_low:w_high]
-    # Convert to boolean
-    img = np.round(img).astype(bool)
-
-  # Resize
-  img = scipy.misc.imresize(img, [params.res["height"], params.res["width"]])
+    img = np.atleast_3d(img)
+  
   return img
 
 ####################################
@@ -210,8 +210,8 @@ def LoadTrainBatch(batch_size):
   x_out = []
   y_out = []
   for i in range(0, batch_size):
-      x_out.append(process_img(scipy.misc.imread(train_x_random[(train_batch_pointer_random + i) % num_train_imgs])))
-      y_out.append(process_img(scipy.misc.imread(train_y_random[(train_batch_pointer_random + i) % num_train_imgs])))
+      x_out.append(process_img(scipy.misc.imread(train_x_random[(train_batch_pointer_random + i) % num_train_imgs], 'L'), label=False))
+      y_out.append(process_img(scipy.misc.imread(train_y_random[(train_batch_pointer_random + i) % num_train_imgs]), label=True))
       
   train_batch_pointer_random += batch_size
   return x_out, y_out
@@ -221,10 +221,8 @@ def LoadOrderedTrainBatch():
   global train_batch_pointer_ordered
   global train_dataset_num
 
-  x_out = []
-  y_out = []
-  x_out.append(process_img(scipy.misc.imread(train_x_ordered[train_batch_pointer_ordered % num_train_imgs])))
-  y_out.append(process_img(scipy.misc.imread(train_y_ordered[train_batch_pointer_ordered % num_train_imgs])))
+  x_out = np.expand_dims(process_img(scipy.misc.imread(train_x_ordered[train_batch_pointer_ordered % num_train_imgs], 'L'), label=False), axis=0)
+  y_out = np.expand_dims(process_img(scipy.misc.imread(train_y_ordered[train_batch_pointer_ordered % num_train_imgs], 'L'), label=True), axis=0)
   
   train_batch_pointer_ordered += 1
 
@@ -242,8 +240,8 @@ def LoadValBatch(batch_size):
   x_out = []
   y_out = []
   for i in range(0, batch_size):
-      x_out.append(process_img(scipy.misc.imread(val_x_random[(val_batch_pointer_random + i) % num_val_imgs])))
-      y_out.append(process_img(scipy.misc.imread(val_y_random[(val_batch_pointer_random + i) % num_val_imgs])))
+      x_out = append(process_img(scipy.misc.imread(val_x_random[(val_batch_pointer_random + i) % num_val_imgs], 'L'), label=False))
+      y_out = append(process_img(scipy.misc.imread(val_y_random[(val_batch_pointer_random + i) % num_val_imgs], 'L'), label=True))
 
   val_batch_pointer_random += batch_size
   return x_out, y_out
@@ -253,10 +251,8 @@ def LoadOrderedValBatch():
   global val_batch_pointer_ordered
   global val_dataset_num
 
-  x_out = []
-  y_out = []
-  x_out.append(process_img(scipy.misc.imread(val_x_ordered[val_batch_pointer_ordered % num_val_imgs])))
-  y_out.append(process_img(scipy.misc.imread(val_y_ordered[val_batch_pointer_ordered % num_val_imgs])))
+  x_out.np.expand_dims(process_img(scipy.misc.imread(val_x_ordered[val_batch_pointer_ordered % num_val_imgs], 'L'), label=False), axis=0)
+  y_out.np.expand_dims(process_img(scipy.misc.imread(val_y_ordered[val_batch_pointer_ordered % num_val_imgs], 'L'), label=True), axis=0)
 
   val_batch_pointer_ordered += 1
 
@@ -273,7 +269,7 @@ def LoadTestBatch(batch_size):
   global test_batch_pointer_random
   x_out = []
   for i in range(0, batch_size):
-      x_out.append(process_img(scipy.misc.imread(test_random[(test_batch_pointer_random + i) % num_test_imgs])))
+      x_out.append(process_img(scipy.misc.imread(test_random[(test_batch_pointer_random + i) % num_test_imgs], 'L'), label=False))
       
   test_batch_pointer_random += batch_size
   return x_out
@@ -283,8 +279,7 @@ def LoadOrderedTestBatch():
   global test_batch_pointer_ordered
   global test_dataset_num
 
-  x_out = []
-  x_out.append(process_img(scipy.misc.imread(test_ordered[test_batch_pointer_ordered % num_test_imgs])))
+  x_out = np.expand_dims(process_img(scipy.misc.imread(test_ordered[test_batch_pointer_ordered % num_test_imgs], 'L'), label=False), axis=0)
       
   test_batch_pointer_ordered += 1
 

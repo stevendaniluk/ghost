@@ -32,7 +32,7 @@ with tf.name_scope('dropout'):
 	keep_prob = tf.placeholder(tf.float32)
 
 # Make input and output variables
-x = tf.placeholder(tf.float32, shape=[None, params.res["height"], params.res["width"], 3])
+x = tf.placeholder(tf.float32, shape=[None, params.res["height"], params.res["width"], 1])
 y_ = tf.placeholder(tf.bool, shape=[None, params.res["height"], params.res["width"]])
 prev_y = tf.placeholder(tf.bool, shape=[None, params.res["height"], params.res["width"]])
 
@@ -46,7 +46,7 @@ x_in = x
 # Convolution
 layer_name = "s1_conv1_1"
 with tf.name_scope(layer_name):
-  W = utils.weight_variable([5, 5, 3, ch[0]])
+  W = utils.weight_variable([5, 5, 1, ch[0]])
   b = utils.bias_variable([ch[0]])
   conv = utils.conv2d(x_in, W, b, 1)
 
@@ -157,8 +157,7 @@ with tf.name_scope(layer_name):
   b = utils.bias_variable([1])
   conv = utils.conv2d(s2_conv6_1, W, b, 1)
   
-  tanh = tf.nn.tanh(conv)
-  s3_conv1_1 = tf.nn.dropout(tanh, keep_prob)
+  s3_conv1_1 = conv
 
 ##############################
 
