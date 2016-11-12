@@ -240,8 +240,8 @@ def LoadValBatch(batch_size):
   x_out = []
   y_out = []
   for i in range(0, batch_size):
-      x_out = append(process_img(scipy.misc.imread(val_x_random[(val_batch_pointer_random + i) % num_val_imgs], 'L'), label=False))
-      y_out = append(process_img(scipy.misc.imread(val_y_random[(val_batch_pointer_random + i) % num_val_imgs], 'L'), label=True))
+      x_out.append(process_img(scipy.misc.imread(val_x_random[(val_batch_pointer_random + i) % num_val_imgs], 'L'), label=False))
+      y_out.append(process_img(scipy.misc.imread(val_y_random[(val_batch_pointer_random + i) % num_val_imgs], 'L'), label=True))
 
   val_batch_pointer_random += batch_size
   return x_out, y_out
@@ -251,8 +251,8 @@ def LoadOrderedValBatch():
   global val_batch_pointer_ordered
   global val_dataset_num
 
-  x_out.np.expand_dims(process_img(scipy.misc.imread(val_x_ordered[val_batch_pointer_ordered % num_val_imgs], 'L'), label=False), axis=0)
-  y_out.np.expand_dims(process_img(scipy.misc.imread(val_y_ordered[val_batch_pointer_ordered % num_val_imgs], 'L'), label=True), axis=0)
+  x_out = np.expand_dims(process_img(scipy.misc.imread(val_x_ordered[val_batch_pointer_ordered % num_val_imgs], 'L'), label=False), axis=0)
+  y_out = np.expand_dims(process_img(scipy.misc.imread(val_y_ordered[val_batch_pointer_ordered % num_val_imgs], 'L'), label=True), axis=0)
 
   val_batch_pointer_ordered += 1
 
