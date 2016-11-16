@@ -24,6 +24,11 @@ if tf.gfile.Exists(params.log_dir):
 tf.gfile.MakeDirs(params.log_dir)
 tf.gfile.MakeDirs(params.log_dir + "/images")
 
+# Make model directory
+if (params.save_model or params.early_stopping):
+  if not os.path.exists(params.model_ckpt_dir):
+    os.makedirs(params.model_ckpt_dir)
+
 sess = tf.InteractiveSession()
 
 # Use weighted cross entropy as the loss function
@@ -71,14 +76,15 @@ saver = tf.train.Saver()
 
 if (params.sequential):
   # Initialize previous prediction
-  prev_prediction = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
-  prev_label = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
+  prev_prediction = np.full((1, params.res["height"], params.res["width"]), 0.0)
 
   # Set initial dataset
   train_dataset_num = data.train_dataset_num
 
-# Train the model, and also write summaries.
-# Every 100th step save meta data
+# Train the model, write summaries, and check accuracy on the entire validations set
+# Sample predictions and metadata will be periodically saved.
+best_val_acc = 0
+best_val_acc_step = 0
 print "Beginning training (max {0} steps).".format(params.max_steps)
 for i in range(params.max_steps):
 
@@ -91,14 +97,14 @@ for i in range(params.max_steps):
     # If datasets have changed, the previous predicition must be randomized
     if train_dataset_num != data.train_dataset_num:
       train_dataset_num = data.train_dataset_num
-      prev_prediction = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
-      prev_label = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
-      print "New dataset."
+      prev_prediction = np.full((1, params.res["height"], params.res["width"]), 0.0)
+      print "Next dataset started."
   else:
     xs, ys = data.LoadTrainBatch(params.batch_size)
     feed_dict = {model.x:xs, model.y_:ys, model.keep_prob:params.dropout, model.training:True}
 
-  if i % 100 == 99:
+  # Train operation
+  if i % 500 == 499:
     # Record execution stats 
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     run_metadata = tf.RunMetadata()
@@ -113,27 +119,44 @@ for i in range(params.max_steps):
     summary, loss, _ = sess.run([merged, cross_entropy, train_step], feed_dict=feed_dict)
     train_writer.add_summary(summary, i)
 
-  print "Training step {0} loss:{1:.3f}".format(i, loss)
+  if i % 10 == 0:
+    print "Training step {0} loss:{1:.3f}".format(i, loss)
+  
+  # Measure validation set accuracy (over entire set)
+  if (i % 100 == 0):
+    acc_count = 0
 
-  if (params.sequential):
-    # Get the prediction for next step
-    feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:1.0, model.training:False}
-    prev_prediction = sess.run(model.prediction, feed_dict=feed_dict)
-    
-    # Save the label for the next step
-    prev_label = ys
-  else:
-    # Training on randomized data, so check validation performance
-    if (i % 20 == 0):
-      # Measure validation set accuracy
-      xs, ys = data.LoadValBatch(params.batch_size)
-      feed_dict={model.x: xs, model.y_: ys, model.keep_prob: 1.0, model.training:False}
-      summary, acc = sess.run([merged, accuracy], feed_dict=feed_dict)
-      val_writer.add_summary(summary, i)
-      print "Validation accuracy: {0:.3f}".format(acc)
+    # Loop through each image in the validation set.
+    # Write a summary for the last image, and run one extra time and to rotate through
+    # the dataset so the summary isn't always on the same image
+    for j in range(data.num_val_imgs + 1):
+      if (params.sequential):
+        xs, ys, prev_ys = data.LoadOrderedValBatch()
+        feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_ys, model.keep_prob:1.0, model.training:False}
+      else:
+        xs, ys = data.LoadValBatch(1)
+        feed_dict={model.x: xs, model.y_: ys, model.keep_prob: 1.0, model.training:False}
+
+      if j == data.num_val_imgs:
+        summary = sess.run(merged, feed_dict=feed_dict)
+      else:
+        acc_count += sess.run(accuracy, feed_dict=feed_dict)
+
+    acc = acc_count/data.num_val_imgs
+    print "Validation set accuracy: {0:.3f}".format(acc)
+    val_writer.add_summary(summary, i)
+
+    # Save model when it has improved
+    if params.early_stopping and acc > best_val_acc:
+      best_val_acc = acc
+      best_val_acc_step = i
+
+      checkpoint_path = os.path.join(params.model_ckpt_dir, "model.ckpt")
+      filename = saver.save(sess, checkpoint_path)
+      print "Model saved in file: {0}.".format(filename)
 
   # Save sample predictions
-  if i % 20 == 19:
+  if i % 100 == 0:
     if (params.sequential):
       feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:1.0, model.training:False}
     else:
@@ -141,19 +164,28 @@ for i in range(params.max_steps):
     
     prediction = sess.run(model.prediction, feed_dict=feed_dict)
 
-    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_raw.png"), xs[0])
+    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_raw.png"), np.squeeze(xs[0]))
     scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "._label.png"), ys[0])
     scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "._pred.png"), prediction[0])
     print "Saved sample images."
+
+  # Early stopping
+  if params.early_stopping and (i - best_val_acc_step) > 1000:
+    print "Stopping at step {0}.".format(i)
+    break
+
+  # When training sequentially, get the prediction and label for the next step
+  if (params.sequential):
+    # Get the prediction and label for the next step
+    feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:1.0, model.training:False}
+    prev_prediction = tf.sigmoid(sess.run(model.y, feed_dict=feed_dict)).eval()
 
 train_writer.close()
 val_writer.close()
 print "Training complete." 
 
-if (params.save_model):
-  # Save the model
-  if not os.path.exists(params.model_ckpt_dir):
-    os.makedirs(params.model_ckpt_dir)
+# Save the final model (if desired)
+if (params.save_model and not params.early_stopping):
   checkpoint_path = os.path.join(params.model_ckpt_dir, "model.ckpt")
   filename = saver.save(sess, checkpoint_path)
   print "Model saved in file: {0}.".format(filename)

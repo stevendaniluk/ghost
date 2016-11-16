@@ -34,11 +34,16 @@ with tf.name_scope('dropout'):
 # Make input and output variables
 x = tf.placeholder(tf.float32, shape=[None, params.res["height"], params.res["width"], 1])
 y_ = tf.placeholder(tf.bool, shape=[None, params.res["height"], params.res["width"]])
-prev_y = tf.placeholder(tf.bool, shape=[None, params.res["height"], params.res["width"]])
+prev_y = tf.placeholder(tf.float32, shape=[None, params.res["height"], params.res["width"]])
 
-#prev_y_in = tf.sub(tf.cast(tf.expand_dims(prev_y, 3), tf.float32), 0.5)
-#x_in = tf.concat(3, [x, prev_y_in])
-x_in = x
+# Add in previous prediction for sequential training
+if params.sequential:
+  prev_y_in = tf.sub(tf.cast(tf.expand_dims(prev_y, 3), tf.float32), 0.5)
+  x_in = tf.concat(3, [x, prev_y_in])
+  ch_in = 2
+else:
+  x_in = x
+  ch_in = 1
 
 ##############################
 # Section 1
@@ -46,7 +51,7 @@ x_in = x
 # Convolution
 layer_name = "s1_conv1_1"
 with tf.name_scope(layer_name):
-  W = utils.weight_variable([5, 5, 1, ch[0]])
+  W = utils.weight_variable([5, 5, ch_in, ch[0]])
   b = utils.bias_variable([ch[0]])
   conv = utils.conv2d(x_in, W, b, 1)
 
