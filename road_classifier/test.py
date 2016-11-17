@@ -22,15 +22,15 @@ import parameters as params
 import model as model
 import time
 
-# Set the name of the model to be tested
-model_name = "model"
+# Set the name of the model filename to be tested
+model_filename = "model"
 
 sess = tf.InteractiveSession()
 
 # Load the model
 saver = tf.train.Saver()
-saver.restore(sess, "trained_models/" + model_name + "/model.ckpt")
-print "Loaded model: " + model_name + "."
+saver.restore(sess, "trained_models/" + model_filename + "/model.ckpt")
+print "Loaded model: " + model_filename + "."
 
 # Ops to be performed during testing
 with tf.name_scope('prediction_stats'):
@@ -52,13 +52,20 @@ false_pos_stat = []
 false_neg_stat = []
 IoU_stat = []
 
+# Set initial dataset
+dataset_num = data.train_dataset_num
+
 # Cycle through entire test set
 n = data.num_raws
 print "Beginning testing on {0} images.\n".format(n)
 for i in range(n):
 	x, y = data.LoadOrderedTrainBatch()
+	# If datasets have changed, the previous predicition must be reset
+	if dataset_num != data.train_dataset_num:
+		dataset_num = data.train_dataset_num
+		prev_pred = np.full((1, params.res["height"], params.res["width"]), 0.0)
+
 	feed_dict = {model.x:x, model.y_:y, model.prev_y:prev_pred, model.keep_prob:1.0, model.training:False}
-	
 	prev_pred, acc_i, true_pos_i, true_neg_i, false_pos_i, false_neg_i, IoU_i = sess.run([model.prediction, accuracy, true_pos, true_neg, false_pos, false_neg, IoU], feed_dict=feed_dict)
 
 	# Log metrics

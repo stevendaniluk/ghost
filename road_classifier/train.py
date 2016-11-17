@@ -92,13 +92,13 @@ for i in range(params.max_steps):
   if (params.sequential):
     # Get training data
     xs, ys = data.LoadOrderedTrainBatch()
-    feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:params.dropout, model.training:True}
-
-    # If datasets have changed, the previous predicition must be randomized
+    # If datasets have changed, the previous predicition must be reset
     if train_dataset_num != data.train_dataset_num:
       train_dataset_num = data.train_dataset_num
       prev_prediction = np.full((1, params.res["height"], params.res["width"]), 0.0)
       print "Next dataset started."
+
+    feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:params.dropout, model.training:True}
   else:
     xs, ys = data.LoadTrainBatch(params.batch_size)
     feed_dict = {model.x:xs, model.y_:ys, model.keep_prob:params.dropout, model.training:True}
