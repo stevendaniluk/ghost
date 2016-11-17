@@ -137,11 +137,11 @@ def bottleneck(x, k, rate=1, training=True, batch_norm=False, name=None, summari
 		b3 = conv2d(b2, W, b, 1)
 
 	# Normalization
-	with tf.variable_scope(name + "/norm") as scope:
-		if batch_norm:
-		  b4 = batch_norm(b3, is_training=training, scope=scope)
-		else:
-			b4 = b3
+	if batch_norm:
+		with tf.variable_scope(name + "/norm") as scope:
+			b4 = batch_norm(b3, is_training=training, scope=scope)
+	else:
+		b4 = b3
 
 	with tf.name_scope('out'):
 	  out = tf.add(x, b4)
