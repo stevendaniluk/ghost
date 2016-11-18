@@ -23,7 +23,7 @@ import model as model
 import time
 
 # Set the name of the model filename to be tested
-model_filename = "model"
+model_filename = "test"
 
 sess = tf.InteractiveSession()
 
@@ -41,7 +41,6 @@ with tf.name_scope('prediction_stats'):
 	false_neg = tf.reduce_mean(tf.cast(tf.logical_and(tf.logical_not(model.prediction), model.y_), tf.float32))
 	IoU = true_pos/(true_pos + false_pos + false_neg)
 
-# Initialize previous prediction
 prev_pred = np.full((1, params.res["height"], params.res["width"]), 0.0)
 
 # Performance stats to be filled
@@ -52,21 +51,19 @@ false_pos_stat = []
 false_neg_stat = []
 IoU_stat = []
 
-# Set initial dataset
-dataset_num = data.train_dataset_num
+# Initialize previous prediction
+prev_pred = np.full((1, params.res["height"], params.res["width"]), 0.5)
 
 # Cycle through entire test set
-n = data.num_raws
+n = data.num_train_imgs
 print "Beginning testing on {0} images.\n".format(n)
 for i in range(n):
-	x, y = data.LoadOrderedTrainBatch()
-	# If datasets have changed, the previous predicition must be reset
-	if dataset_num != data.train_dataset_num:
-		dataset_num = data.train_dataset_num
-		prev_pred = np.full((1, params.res["height"], params.res["width"]), 0.0)
+	x, y, prev_x = data.LoadTrainBatch(1)
+	feed_dict = {model.x:x, model.y_:y, model.prev_y:prev_pred, model.keep_prob:1.0}
+	pred, acc_i, true_pos_i, true_neg_i, false_pos_i, false_neg_i, IoU_i = sess.run([model.prediction, accuracy, true_pos, true_neg, false_pos, false_neg, IoU], feed_dict=feed_dict)
 
-	feed_dict = {model.x:x, model.y_:y, model.prev_y:prev_pred, model.keep_prob:1.0, model.training:False}
-	prev_pred, acc_i, true_pos_i, true_neg_i, false_pos_i, false_neg_i, IoU_i = sess.run([model.prediction, accuracy, true_pos, true_neg, false_pos, false_neg, IoU], feed_dict=feed_dict)
+	if params.feedback:
+		prev_pred = pred
 
 	# Log metrics
 	acc_stat.append(acc_i)
@@ -78,15 +75,18 @@ for i in range(n):
 
 # Perform inference 10 times to get an average computation time (done separately so
 # the time to compute all the metrics is not included)
-prev_pred = np.random.rand(1, params.res["height"], params.res["width"]).tolist()
+prev_pred = np.full((1, params.res["height"], params.res["width"]), 0.5)
 inf_time = []
 for i in range(10):
-	x, y = data.LoadOrderedTrainBatch()
-	feed_dict = {model.x:x, model.prev_y:prev_pred, model.keep_prob:1.0, model.training:False}
+	x, y, prev_x = data.LoadTrainBatch(1)
+	feed_dict = {model.x:x, model.prev_y:prev_pred, model.keep_prob:1.0}
 
 	start_time = time.time()
-	prev_pred = sess.run(model.prediction, feed_dict=feed_dict)
+	pred = sess.run(model.prediction, feed_dict=feed_dict)
 	inf_time.append(time.time() - start_time)
+
+	if params.feedback:
+		prev_pred = pred
 
 # Display all the results
 print "------- Results --------"

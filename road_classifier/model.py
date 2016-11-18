@@ -31,19 +31,18 @@ training = tf.placeholder(tf.bool, name='training')
 with tf.name_scope('dropout'):
 	keep_prob = tf.placeholder(tf.float32)
 
+# Dropout variable
+with tf.name_scope('dropout'):
+  keep_prob = tf.placeholder(tf.float32)
+
 # Make input and output variables
 x = tf.placeholder(tf.float32, shape=[None, params.res["height"], params.res["width"], 1])
 y_ = tf.placeholder(tf.bool, shape=[None, params.res["height"], params.res["width"]])
 prev_y = tf.placeholder(tf.float32, shape=[None, params.res["height"], params.res["width"]])
 
-# Add in previous prediction for sequential training
-if params.sequential:
-  prev_y_in = tf.sub(tf.cast(tf.expand_dims(prev_y, 3), tf.float32), 0.5)
-  x_in = tf.concat(3, [x, prev_y_in])
-  ch_in = 2
-else:
-  x_in = x
-  ch_in = 1
+prev_y_in = tf.sub(tf.expand_dims(prev_y, 3), 0.5)
+x_in = tf.concat(3, [x, prev_y_in])
+ch_in = 2
 
 ##############################
 # Section 1

@@ -74,12 +74,11 @@ print "Initializing variables."
 tf.initialize_all_variables().run()
 saver = tf.train.Saver()
 
-if (params.sequential):
-  # Initialize previous prediction
-  prev_prediction = np.full((1, params.res["height"], params.res["width"]), 0.0)
-
-  # Set initial dataset
-  train_dataset_num = data.train_dataset_num
+# Initialize previous prediction
+null_pred = np.full((params.batch_size, params.res["height"], params.res["width"]), 0.5)
+null_pred_single = np.full((1, params.res["height"], params.res["width"]), 0.5)
+prev_pred = null_pred
+val_prev_pred = null_pred_single
 
 # Train the model, write summaries, and check accuracy on the entire validations set
 # Sample predictions and metadata will be periodically saved.
@@ -88,20 +87,15 @@ best_val_acc_step = 0
 print "Beginning training (max {0} steps).".format(params.max_steps)
 for i in range(params.max_steps):
 
-  # Get randomized or ordered data
-  if (params.sequential):
-    # Get training data
-    xs, ys = data.LoadOrderedTrainBatch()
-    # If datasets have changed, the previous predicition must be reset
-    if train_dataset_num != data.train_dataset_num:
-      train_dataset_num = data.train_dataset_num
-      prev_prediction = np.full((1, params.res["height"], params.res["width"]), 0.0)
-      print "Next dataset started."
+  # Load the data
+  x, y, prev_x = data.LoadTrainBatch(params.batch_size)
 
-    feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:params.dropout, model.training:True}
-  else:
-    xs, ys = data.LoadTrainBatch(params.batch_size)
-    feed_dict = {model.x:xs, model.y_:ys, model.keep_prob:params.dropout, model.training:True}
+  if params.feedback:
+    # Form prediciton
+    feed_dict = {model.x:prev_x, model.prev_y:null_pred, model.keep_prob:1.0}
+    prev_pred = tf.sigmoid(sess.run(model.y, feed_dict=feed_dict)).eval()
+
+  feed_dict = {model.x:x, model.y_:y, model.prev_y:prev_pred, model.keep_prob:params.dropout}
 
   # Train operation
   if i % 500 == 499:
@@ -121,6 +115,16 @@ for i in range(params.max_steps):
 
   if i % 10 == 0:
     print "Training step {0} loss:{1:.3f}".format(i, loss)
+
+  # Save sample predictions
+  if i % 100 == 0:
+    feed_dict = {model.x:x, model.y_:y, model.prev_y:prev_pred, model.keep_prob:1.0}    
+    prediction = sess.run(model.prediction, feed_dict=feed_dict)
+
+    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_raw.png"), np.squeeze(x[0]))
+    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "._label.png"), y[0])
+    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "._pred.png"), prediction[0])
+    print "Saved sample images."
   
   # Measure validation set accuracy (over entire set)
   if (i % 100 == 0):
@@ -130,12 +134,14 @@ for i in range(params.max_steps):
     # Write a summary for the last image, and run one extra time and to rotate through
     # the dataset so the summary isn't always on the same image
     for j in range(data.num_val_imgs + 1):
-      if (params.sequential):
-        xs, ys, prev_ys = data.LoadOrderedValBatch()
-        feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_ys, model.keep_prob:1.0, model.training:False}
-      else:
-        xs, ys = data.LoadValBatch(1)
-        feed_dict={model.x: xs, model.y_: ys, model.keep_prob: 1.0, model.training:False}
+      x, y, prev_x = data.LoadValBatch(1)
+
+      if params.feedback:
+        # Form prediciton
+        feed_dict = {model.x:prev_x, model.prev_y:null_pred_single, model.keep_prob:1.0}
+        val_prev_pred = tf.sigmoid(sess.run(model.y, feed_dict=feed_dict)).eval()
+
+      feed_dict={model.x:x, model.y_:y, model.prev_y:val_prev_pred, model.keep_prob: 1.0}
 
       if j == data.num_val_imgs:
         summary = sess.run(merged, feed_dict=feed_dict)
@@ -155,30 +161,10 @@ for i in range(params.max_steps):
       filename = saver.save(sess, checkpoint_path)
       print "Model saved in file: {0}.".format(filename)
 
-  # Save sample predictions
-  if i % 100 == 0:
-    if (params.sequential):
-      feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:1.0, model.training:False}
-    else:
-      feed_dict = {model.x:xs, model.y_:ys, model.keep_prob:1.0, model.training:False}
-    
-    prediction = sess.run(model.prediction, feed_dict=feed_dict)
-
-    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "_raw.png"), np.squeeze(xs[0]))
-    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "._label.png"), ys[0])
-    scipy.misc.imsave((params.log_dir + "/images/step_" + str(i) + "._pred.png"), prediction[0])
-    print "Saved sample images."
-
   # Early stopping
   if params.early_stopping and (i - best_val_acc_step) > 1000:
     print "Stopping at step {0}.".format(i)
     break
-
-  # When training sequentially, get the prediction and label for the next step
-  if (params.sequential):
-    # Get the prediction and label for the next step
-    feed_dict = {model.x:xs, model.y_:ys, model.prev_y:prev_prediction, model.keep_prob:1.0, model.training:False}
-    prev_prediction = tf.sigmoid(sess.run(model.y, feed_dict=feed_dict)).eval()
 
 train_writer.close()
 val_writer.close()

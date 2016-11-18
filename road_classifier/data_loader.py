@@ -25,33 +25,26 @@ import parameters as params
 import numpy as np
 
 # Pointers for the end of the last batch
-train_batch_pointer_random = 0
-val_batch_pointer_random = 0
-test_batch_pointer_random = 0
-train_batch_pointer_ordered = 0
-val_batch_pointer_ordered = 0
-test_batch_pointer_ordered = 0
-
-train_dataset_num = 0
-val_dataset_num = 0
-test_dataset_num = 0
+train_batch_pointer = 0
+val_batch_pointer = 0
+test_batch_pointer = 0
 
 valid_images = [".jpg", ".png"]
 
 # Temporary lists for getting image names
-x_img_names = [] 
-y_img_names = []
+temp_x_names = [] 
+temp_y_names = []
 
 # Full lists of image names (randomized)
-x_ordered = []
-y_ordered = []
-train_x_random = []
-train_y_random = []
-val_x_random = []
-val_y_random = []
-
-# List of sizes for each dataset
-dataset_sizes = []
+x = []
+y = []
+prev_x = []
+train_x = []
+train_y= []
+train_prev_x = []
+val_x = []
+val_y = []
+val_prev_y = []
 
 for name in params.datasets:
   print "Scanning dataset: {0}".format(name)
@@ -69,42 +62,41 @@ for name in params.datasets:
     # Check for the labeled image
     label_name = os.path.splitext(raw_name)[0] + "_label" + os.path.splitext(raw_name)[1]
     if os.path.isfile(os.path.join(label_path, label_name)):
-      x_img_names.append(os.path.join(raw_path, raw_name))
-      y_img_names.append(os.path.join(label_path, label_name))
+      temp_x_names.append(os.path.join(raw_path, raw_name))
+      temp_y_names.append(os.path.join(label_path, label_name))
     else:
       print "No label found for {0}. Will be ignored.".format(label_name)
 
-  # Find split size for this set
-  set_num_raws = len(x_img_names)
-
-  # Record set sizes
-  dataset_sizes.append(set_num_raws)
-
   # Add to image lists
-  x_ordered += sorted(x_img_names, key=str.lower)
-  y_ordered += sorted(y_img_names, key=str.lower)
+  x += sorted(temp_x_names, key=str.lower)
+  y += sorted(temp_y_names, key=str.lower)
+  prev_x.append(None)
+  prev_x += sorted(temp_x_names, key=str.lower)
+  prev_x.pop()
 
   # Clear for next loop
-  x_img_names = []
-  y_img_names = []
+  temp_x_names = []
+  temp_y_names = []
 
 # Get total image numbers to print
-num_raws = len(x_ordered)
-num_labels = len(y_ordered)
+num_raws = len(x)
+num_labels = len(y)
 
 # Shuffle the list of images for randomized lists
 if (num_raws > 0 and num_labels > 0):
-  c = list(zip(x_ordered, y_ordered))
+  c = list(zip(x, y, prev_x))
   random.shuffle(c)
-  x_random, y_random = zip(*c)
+  x, y, prev_x = zip(*c)
 
 # Split randomized images into training and validation sets
 num_train_imgs = int(math.ceil(num_raws * params.train_frac))
 num_val_imgs = int(math.floor(num_raws * params.val_frac))
-train_x_random = x_random[:num_train_imgs]
-train_y_random = y_random[:num_train_imgs]
-val_x_random = x_random[-num_val_imgs:]
-val_y_random = y_random[-num_val_imgs:]
+train_x = x[:num_train_imgs]
+train_y = y[:num_train_imgs]
+train_prev_x = prev_x[:num_train_imgs]
+val_x = x[-num_val_imgs:]
+val_y = y[-num_val_imgs:]
+val_prev_x = prev_x[-num_val_imgs:]
 
 # Error checking
 if num_raws != num_labels:
@@ -165,66 +157,38 @@ def process_img(img, label):
   
   return img
 
-####################################
-
 # Function for getting randomized training images
 def LoadTrainBatch(batch_size):
-  global train_batch_pointer_random
+  global train_batch_pointer
   x_out = []
   y_out = []
+  prev_x_out = []
   for i in range(0, batch_size):
-      x_out.append(process_img(scipy.misc.imread(train_x_random[(train_batch_pointer_random + i) % num_train_imgs], 'L'), label=False))
-      y_out.append(process_img(scipy.misc.imread(train_y_random[(train_batch_pointer_random + i) % num_train_imgs]), label=True))
+      x_out.append(process_img(scipy.misc.imread(train_x[(train_batch_pointer + i) % num_train_imgs], 'L'), label=False))
+      y_out.append(process_img(scipy.misc.imread(train_y[(train_batch_pointer + i) % num_train_imgs]), label=True))
       
-  train_batch_pointer_random += batch_size
-  return x_out, y_out
+      if train_prev_x[(train_batch_pointer + i) % num_train_imgs] == None:
+        prev_x_out.append(np.full((params.res["height"], params.res["width"], 1), 0.5))
+      else:
+        prev_x_out.append(process_img(scipy.misc.imread(train_prev_x[(train_batch_pointer + i) % num_train_imgs], 'L'), label=False))
 
-# Function for getting sequential training images
-def LoadOrderedTrainBatch():
-  global train_batch_pointer_ordered
-  global train_dataset_num
-
-  x_out = np.expand_dims(process_img(scipy.misc.imread(x_ordered[train_batch_pointer_ordered % num_train_imgs], 'L'), label=False), axis=0)
-  y_out = np.expand_dims(process_img(scipy.misc.imread(y_ordered[train_batch_pointer_ordered % num_train_imgs], 'L'), label=True), axis=0)
-  
-  train_batch_pointer_ordered += 1
-
-  # Reset the dataset number
-  if train_batch_pointer_ordered % dataset_sizes[train_dataset_num] == 0:
-    train_dataset_num = (train_dataset_num + 1) % len(dataset_sizes)
-
-  return x_out, y_out
-
-####################################
+  train_batch_pointer += batch_size
+  return x_out, y_out, prev_x_out
 
 # Function for getting randomized validation images
 def LoadValBatch(batch_size):
-  global val_batch_pointer_random
+  global val_batch_pointer
   x_out = []
   y_out = []
+  prev_x_out = []
   for i in range(0, batch_size):
-      x_out.append(process_img(scipy.misc.imread(val_x_random[(val_batch_pointer_random + i) % num_val_imgs], 'L'), label=False))
-      y_out.append(process_img(scipy.misc.imread(val_y_random[(val_batch_pointer_random + i) % num_val_imgs], 'L'), label=True))
+      x_out.append(process_img(scipy.misc.imread(val_x[(val_batch_pointer + i) % num_val_imgs], 'L'), label=False))
+      y_out.append(process_img(scipy.misc.imread(val_y[(val_batch_pointer + i) % num_val_imgs]), label=True))
 
-  val_batch_pointer_random += batch_size
-  return x_out, y_out
+      if val_prev_x[(val_batch_pointer + i) % num_val_imgs] == None:
+        prev_x_out.append(np.full((params.res["height"], params.res["width"], 1), 0.5))
+      else:
+        prev_x_out.append(process_img(scipy.misc.imread(val_prev_x[(val_batch_pointer + i) % num_val_imgs], 'L'), label=False))
 
-# Function for getting sequential validation images
-def LoadOrderedValBatch():
-  global val_batch_pointer_ordered
-  global val_dataset_num
-
-  x_out = np.expand_dims(process_img(scipy.misc.imread(x_ordered[val_batch_pointer_ordered % num_val_imgs], 'L'), label=False), axis=0)
-  y_out = np.expand_dims(process_img(scipy.misc.imread(y_ordered[val_batch_pointer_ordered % num_val_imgs], 'L'), label=True), axis=0)
-  
-  prev_val_batch_pointer_ordered = val_batch_pointer_ordered
-  val_batch_pointer_ordered += int(round(1/params.val_frac))
-
-  # Account for beginning new dataset
-  if val_batch_pointer_ordered % dataset_sizes[val_dataset_num] < round(1/params.val_frac):
-    prev_y_out = np.full((1, params.res["height"], params.res["width"]), 0.0)
-    val_dataset_num = (val_dataset_num + 1) % len(dataset_sizes)
-  else:
-    prev_y_out = np.expand_dims(process_img(scipy.misc.imread(y_ordered[(prev_val_batch_pointer_ordered - 1) % num_val_imgs], 'L'), label=True) - 0.5, axis=0)
-
-  return x_out, y_out, prev_y_out
+  val_batch_pointer += batch_size
+  return x_out, y_out, prev_x_out
