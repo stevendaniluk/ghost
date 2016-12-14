@@ -1,0 +1,26 @@
+<!-- Main launcher the Lane Detector
+
+-Assumes a nodelet manager is already running
+-->
+<launch>
+  
+  <!-- Set the names of the camera and nodelet -->
+  <arg name="camera"        value="ghost_cam" />
+  <arg name="manager"       value="camera_manager" />
+  
+  <!-- Lane Detector -->
+  <node 
+    pkg="nodelet" 
+    type="nodelet" 
+    name="lane_detector" 
+    args="load ghost/LaneDetector $(arg manager)" 
+    output="screen">
+    <remap from="image_rect_mono" to="$(arg camera)/color/image_rect"/>
+  </node>
+
+  <!-- Load the parameters -->
+  <rosparam 
+      file="$(find ghost)/param/ghost_lane_detector.yaml" 
+      command="load"/>
+
+</launch>

@@ -1,0 +1,21 @@
+# Paremeter settings for Ghost Lane Detector
+
+lane_detector:
+
+# Camera Parameters
+  cam_height: 0.165     # Height of camera from ground plan [m]
+  cam_angle: 0.02       # Angle of camera about the X axis [Deg]
+
+# Scanner Parameters
+  min_range: 0.5        # Minimum detactable range for scanner [m]
+  max_range: 4.0        # Maximum detactable range for scanner [m]
+  angle_increment: 1.0  # Angular resolution of scan [Deg]
+
+# Image Filtering Parameters
+  clahe_clip_limit: 0.5        # Clipping limit for CLAHE histogram equalization
+  gauss_k_size: 3              # Size of kernal for Gaussian blur
+  gauss_sigma_x: 100           # Gaussian kernel standar deviation in the X direction
+  gauss_sigma_y: 10            # Gaussian kernel standar deviation in the Y direction
+  bilateral_k_size: 3          # Size of kernel for bilateral filter
+  bilateral_sigma_color: 1000  # Filter sigma in the color space
+  bilateral_sigma_space: 1000  # Filter sigma in the coordinate space

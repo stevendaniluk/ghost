@@ -1,0 +1,11 @@
+<library path="lib/liblane_detector_nodelet">
+  <class 
+  	name="ghost/LaneDetector" 
+  	type="ghost::LaneDetector" 
+  	base_class_type="nodelet::Nodelet">
+
+    <description>
+      Nodelet for lane detection.
+    </description>
+  </class>
+</library>

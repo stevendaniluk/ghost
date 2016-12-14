@@ -2,18 +2,17 @@ cmake_minimum_required(VERSION 2.8.3)
 project(ghost)
 
 ## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
   message_generation
+  nodelet
   roscpp
   sensor_msgs
   std_msgs
 )
 
-# Declare custom messages
+## Declare custom messages
 add_message_files(
   FILES
   CarControl.msg
@@ -27,16 +26,11 @@ generate_messages(
 
 # Declare the catkin package
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES 
-#  CATKIN_DEPENDS
-#  DEPENDS system_lib
+  LIBRARIES lane_detector_nodelet
+  CATKIN_DEPENDS nodelet roscpp
 )
 
-#set(SOMETHING_HEADER_PATH "../something/include/")
-
 ## Specify additional locations of header files
-# include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
@@ -46,6 +40,7 @@ add_executable(teleop_keyboard src/teleop_keyboard.cpp)
 add_executable(teleop_ps3 src/teleop_ps3.cpp)
 add_executable(car_to_servo_converter src/car_to_servo_converter.cpp)
 add_executable(camera_frame_grabber src/camera_frame_grabber.cpp)
+add_executable(lane_detector_demo src/lane_detector_demo.cpp)
 
 # Declare the dependencies
 add_dependencies(teleop_keyboard ghost_generate_messages_cpp)
@@ -57,9 +52,12 @@ target_link_libraries(teleop_keyboard ${catkin_LIBRARIES})
 target_link_libraries(teleop_ps3 ${catkin_LIBRARIES})
 target_link_libraries(car_to_servo_converter ${catkin_LIBRARIES})
 target_link_libraries(camera_frame_grabber ${catkin_LIBRARIES})
+target_link_libraries(lane_detector_demo ${catkin_LIBRARIES})
 
-# Declare a C++ library
-# add_library(foo src/${PROJECT_NAME}/foo.cpp
-#)
+# Nodelet library
+add_library(lane_detector_nodelet src/lane_detector_nodelet.cpp)
+target_link_libraries(lane_detector_nodelet ${catkin_LIBRARIES})
 
-
+# Node wrapper for lane detector nodelet
+add_executable(lane_detector_node src/lane_detector_node.cpp)
+target_link_libraries(lane_detector_node ${catkin_LIBRARIES})
