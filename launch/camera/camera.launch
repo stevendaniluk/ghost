@@ -9,11 +9,11 @@
   
   <!-- Set the names of the camera and nodelet 
   (everything will be pushed into the camera namespace) -->
-	<arg name="camera"        value="ghost_cam" />
-	<arg name="manager"       value="camera_manager" />
+  <arg name="camera"        value="ghost_cam" />
+  <arg name="manager"       value="camera_manager" />
   
   <!-- Nodelet manager for the camera-->
-	<node 
+  <node 
     pkg="nodelet" 
     type="nodelet" 
     name="$(arg manager)" 
@@ -34,8 +34,8 @@
     name="rectify" 
     args="load image_proc/rectify $(arg manager)" 
     output="screen">
-    <remap from="image_mono" to="$(arg camera)/image_raw"/> 
-    <remap from="image_rect" to="$(arg camera)/image_rect"/> 
+    <remap from="image_mono" to="$(arg camera)/color/image_raw"/> 
+    <remap from="image_rect" to="$(arg camera)/color/image_rect"/> 
   </node>
 
 </launch>

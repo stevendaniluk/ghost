@@ -1,30 +1,52 @@
-<!-- Launch file for RealSense R200 camera -->
+<!-- Launch file for RealSense R200 camera 
+
+Notes:
+  -Manager is given in the global namespace, since the nodelet
+   is pushed into the camera namespace, while the manager is not
+
+-->
 <launch>
+  <arg name="manager" /> <!-- Name of nodelet manager must be fully resolved -->
+  <arg name="camera" /> <!-- Name of camera must be fully resolved -->
 
-    <arg name="camera"       default="camera" />
-    <arg name="manager"      default="manager" />
-    
-    <param name="$(arg camera)/enable_depth"      type="bool" value="false" />
-    <param name="$(arg camera)/enable_color"      type="bool" value="true" />
-    <param name="$(arg camera)/enable_pointcloud" type="bool" value="false" />
-    <param name="$(arg camera)/enable_tf"         type="bool" value="true" />
-    <param name="$(arg camera)/mode"              type="str"  value="manual" />
-    <param name="$(arg camera)/depth_width"       type="int"  value="640" />
-    <param name="$(arg camera)/depth_height"      type="int"  value="480" />
-    <param name="$(arg camera)/color_width"       type="int"  value="1920" />
-    <param name="$(arg camera)/color_height"      type="int"  value="1080" />
-    <param name="$(arg camera)/depth_fps"         type="int"  value="30" />
-    <param name="$(arg camera)/color_fps"         type="int"  value="30" />
+<group ns="$(arg camera)">
 
+  <!-- Set the camera parameters -->
+  <param name="driver/enable_depth"      type="bool" value="false" />
+  <param name="driver/enable_ir"         type="bool" value="false" />
+  <param name="driver/enable_ir2"        type="bool" value="false" />
+  <param name="driver/enable_color"      type="bool" value="true" />
+  <param name="driver/enable_pointcloud" type="bool" value="false" />
+  <param name="driver/enable_tf"         type="bool" value="true" />
+  <param name="driver/mode"              type="str"  value="manual" />
+  <param name="driver/depth_width"       type="int"  value="640" />
+  <param name="driver/depth_height"      type="int"  value="480" />
+  <param name="driver/color_width"       type="int"  value="1920" />
+  <param name="driver/color_height"      type="int"  value="1080" />
+  <param name="driver/depth_fps"         type="int"  value="30" />
+  <param name="driver/color_fps"         type="int"  value="30" />
 
-  <include file="$(find realsense_camera)/launch/includes/nodelet.launch.xml">
-    <arg name="manager"      value="$(arg manager)" />
-    <arg name="camera"       value="$(arg camera)" />
-    <arg name="camera_type"  value="R200" />
-    <arg name="serial_no"    value="" />
-    <arg name="usb_port_id"  value="" /> <!-- USB "Bus#-Port#" -->
-    <arg name="rgb"          value="" />
+  <node 
+    pkg="nodelet" 
+    type="nodelet" 
+    name="driver"
+    args="load realsense_camera/R200Nodelet /$(arg manager)">
 
-  </include>
+    <param name="serial_no"                type="str"  value="" />
+    <param name="usb_port_id"              type="str"  value="" />
+    <param name="camera_type"              type="str"  value="R200" />
+    <param name="base_frame_id"            type="str"  value="$(arg camera)_link" />
+    <param name="depth_frame_id"           type="str"  value="$(arg camera)_depth_frame" />
+    <param name="color_frame_id"           type="str"  value="$(arg camera)_rgb_frame" />
+    <param name="ir_frame_id"              type="str"  value="$(arg camera)_ir_frame" />
+    <param name="ir2_frame_id"             type="str"  value="$(arg camera)_ir2_frame" />
+    <param name="depth_optical_frame_id"   type="str"  value="$(arg camera)_depth_optical_frame" />
+    <param name="color_optical_frame_id"   type="str"  value="$(arg camera)_rgb_optical_frame" />
+    <param name="ir_optical_frame_id"      type="str"  value="$(arg camera)_ir_optical_frame" />
+    <param name="ir2_optical_frame_id"     type="str"  value="$(arg camera)_ir2_optical_frame" />
 
+  </node>
+
+</group>
+  
 </launch>
