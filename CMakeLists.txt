@@ -40,7 +40,6 @@ add_executable(teleop_keyboard src/teleop_keyboard.cpp)
 add_executable(teleop_ps3 src/teleop_ps3.cpp)
 add_executable(car_to_servo_converter src/car_to_servo_converter.cpp)
 add_executable(camera_frame_grabber src/camera_frame_grabber.cpp)
-add_executable(lane_detector_demo src/lane_detector_demo.cpp)
 
 # Declare the dependencies
 add_dependencies(teleop_keyboard ghost_generate_messages_cpp)
@@ -52,7 +51,6 @@ target_link_libraries(teleop_keyboard ${catkin_LIBRARIES})
 target_link_libraries(teleop_ps3 ${catkin_LIBRARIES})
 target_link_libraries(car_to_servo_converter ${catkin_LIBRARIES})
 target_link_libraries(camera_frame_grabber ${catkin_LIBRARIES})
-target_link_libraries(lane_detector_demo ${catkin_LIBRARIES})
 
 # Nodelet library
 add_library(lane_detector_nodelet src/lane_detector_nodelet.cpp)
