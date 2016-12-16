@@ -27,9 +27,11 @@
   <!-- Run Time Dependencies -->
   <run_depend>cv_bridge</run_depend>
   <run_depend>image_transport</run_depend>
+  <run_depend>imu_filter_madgwick</run_depend>
   <run_depend>message_generation</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>nodelet</run_depend>
+  <run_depend>phidgets_imu</run_depend>
   <run_depend>roscpp</run_depend>
   <run_depend>sensor_msgs</run_depend>
   <run_depend>std_msgs</run_depend>
