@@ -53,6 +53,7 @@
     <param name="use_mag" value="true"/>
     <param name="use_magnetic_field_msg" value="false"/>
     <param name="fixed_frame" value="odom"/>
+    <param name="publish_tf" value="false"/>
   </node>
 
 </launch>

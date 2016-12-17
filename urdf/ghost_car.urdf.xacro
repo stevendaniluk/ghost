@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<robot name="ghost_car" xmlns:xacro="http://ros.org/wiki/xacro">
+
+<!-- Car Dimensions -->
+<xacro:property name="length" value=".3" />
+<xacro:property name="width" value=".2" />
+<xacro:property name="height" value=".05" />
+
+<!-- Colours -->
+<material name="blue">
+    <color rgba="0 0 .8 1"/>
+</material>
+<material name="black">
+  <color rgba="0 0 0 1"/>
+</material>
+<material name="white">
+  <color rgba="1 1 1 1"/>
+</material>
+
+<!-- Main body -->
+<link name="base_link">
+    <visual>
+      <geometry>
+        <box size="${length} ${width} ${height}"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 ${.5*height}"/>
+      <material name="blue"/>
+    </visual>
+</link>
+
+<!-- IMU -->
+<link name="imu">
+  <visual>
+    <geometry>
+      <box size=".03 .03 .004"/>
+    </geometry>
+    <origin rpy="0 0 0" xyz="0 0 0.002"/>
+    <material name="black"/>
+  </visual>
+</link>
+<joint name="imu_mount" type="fixed">
+  <parent link="base_link"/>
+  <child link="imu"/>
+  <origin xyz="0 0 ${height}"/>
+</joint>
+
+<!-- Camera -->
+<link name="camera">
+  <visual>
+    <geometry>
+      <box size=".04 .04 .04"/>
+    </geometry>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <material name="white"/>
+  </visual>
+</link>
+<joint name="camera_mount" type="fixed">
+  <parent link="base_link"/>
+  <child link="camera"/>
+  <origin xyz="${.5*length - 0.02} 0 ${height + 0.02}"/>
+</joint>
+
+</robot>

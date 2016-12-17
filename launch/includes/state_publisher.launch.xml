@@ -1,0 +1,17 @@
+<launch>
+
+	<!-- Load URDF file -->
+  <arg name="urdf_file" default="$(find xacro)/xacro.py '$(find ghost)/urdf/ghost_car.urdf.xacro'" />
+  <param name="robot_description" command="$(arg urdf_file)" />
+
+	<node 
+		name="robot_state_publisher" 
+		pkg="robot_state_publisher" 
+		type="state_publisher">
+		<param 
+      name="publish_frequency" 
+      type="double" 
+      value="30.0" 
+    /> 
+	</node>
+</launch>

@@ -5,7 +5,7 @@
 <launch>
   
   <!-- Set the names of the camera and nodelet -->
-  <arg name="camera"        value="ghost_cam" />
+  <arg name="camera"        value="camera" />
   <arg name="manager"       value="camera_manager" />
   
   <!-- Lane Detector -->

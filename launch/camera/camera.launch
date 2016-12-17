@@ -9,7 +9,7 @@
   
   <!-- Set the names of the camera and nodelet 
   (everything will be pushed into the camera namespace) -->
-  <arg name="camera"        value="ghost_cam" />
+  <arg name="camera"        value="camera" />
   <arg name="manager"       value="camera_manager" />
   
   <!-- Nodelet manager for the camera-->

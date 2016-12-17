@@ -40,6 +40,8 @@
 *     -Maximum detactable range for scanner [m]
 *   ~angle_increment (double, default: 1.0)
 *     -Angular resolution of scan [Deg]
+*   ~scan_frame_id (string, default: "camera")
+*     -Name of the frame to attach to the scan message
 *   ~gauss_k_size (int, default 3)
 *     -Size of kernal for Gaussian blur
 *   ~gauss_sigma_x (double, default: 10.0)
@@ -103,6 +105,7 @@ class LaneDetector : public nodelet::Nodelet {
   double max_range_;             // Maximum range of camera/scan
   double min_range_;             // Minimum range of camera/scan
   double scan_angle_increment_;  // Angle between scans
+  std::string scan_frame_id_;   // Name of the frame to attach to the scan message
 
   // Image filtering parameters (loaded from parameter server)
   double clahe_clip_limit_;      // Clipping limit for CLAHE histogram equalization
@@ -141,6 +144,7 @@ class LaneDetector : public nodelet::Nodelet {
     pnh.param<double>("min_range", min_range_, 0.5);
     pnh.param<double>("max_range", max_range_, 5.0);
     pnh.param<double>("angle_increment_", scan_angle_increment_, 1.0);
+    pnh.param<std::string>("scan_frame_id", scan_frame_id_, "camera");
     pnh.param<int>("gauss_k_size", gauss_k_size_, 3);
     pnh.param<double>("gauss_sigma_x", gauss_sigma_x_, 10.0);
     pnh.param<double>("gauss_sigma_y", gauss_sigma_y_, 10.0);
@@ -253,7 +257,7 @@ class LaneDetector : public nodelet::Nodelet {
     // Form the LaserScan message
     sensor_msgs::LaserScan scan;
     scan.header.stamp = ros::Time::now();
-    scan.header.frame_id = image_msg->header.frame_id;
+    scan.header.frame_id = scan_frame_id_;
     scan.angle_min = -PI/2;
     scan.angle_max = PI/2;
     scan.angle_increment = PI/scan_num_points_;

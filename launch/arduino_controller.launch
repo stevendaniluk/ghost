@@ -29,5 +29,8 @@
     args="/dev/ttyUSB0"
     ns="GhostController"
   />
+
+  <!-- Load URDF file -->
+  <include file="$(find ghost)/launch/includes/state_publisher.launch.xml" />
   
 </launch>

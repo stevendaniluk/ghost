@@ -30,12 +30,12 @@ Notes:
     pkg="nodelet" 
     type="nodelet" 
     name="driver"
-    args="load realsense_camera/R200Nodelet /$(arg manager)">
+    args="load realsense_camera/R200Nodelet/$(arg manager)">
 
     <param name="serial_no"                type="str"  value="" />
     <param name="usb_port_id"              type="str"  value="" />
     <param name="camera_type"              type="str"  value="R200" />
-    <param name="base_frame_id"            type="str"  value="$(arg camera)_link" />
+    <param name="base_frame_id"            type="str"  value="$(arg camera)" />
     <param name="depth_frame_id"           type="str"  value="$(arg camera)_depth_frame" />
     <param name="color_frame_id"           type="str"  value="$(arg camera)_rgb_frame" />
     <param name="ir_frame_id"              type="str"  value="$(arg camera)_ir_frame" />

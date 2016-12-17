@@ -7,9 +7,10 @@ lane_detector:
   cam_angle: 0.02       # Angle of camera about the X axis [Deg]
 
 # Scanner Parameters
-  min_range: 0.5        # Minimum detactable range for scanner [m]
-  max_range: 4.0        # Maximum detactable range for scanner [m]
-  angle_increment: 1.0  # Angular resolution of scan [Deg]
+  min_range: 0.5           # Minimum detactable range for scanner [m]
+  max_range: 4.0           # Maximum detactable range for scanner [m]
+  angle_increment: 1.0     # Angular resolution of scan [Deg]
+  scan_frame_id: "camera"  # Name of the frame to attach to the scan message
 
 # Image Filtering Parameters
   clahe_clip_limit: 0.5        # Clipping limit for CLAHE histogram equalization

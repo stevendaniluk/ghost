@@ -8,7 +8,7 @@
     type="lane_detector_node" 
     name="lane_detector" 
     output="screen">
-    <remap from="image_rect_mono" to="ghost_cam/color/image_rect"/>
+    <remap from="image_rect_mono" to="camera/color/image_rect"/>
   </node>
   
   <!-- Load the parameters -->
