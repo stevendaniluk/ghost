@@ -27,7 +27,7 @@ Notes about override servo signals:
 #include <std_msgs/UInt16.h>
 #include <ghost/ServoControl.h>
 #include <Servo.h> 
-#include <PinChangeInt.h> // https://github.com/GreyGnome/PinChangeInt
+#include "PinChangeInt.h" // https://github.com/GreyGnome/PinChangeInt
 
 // Assign servo pins
 #define STEERING_IN_PIN 2
