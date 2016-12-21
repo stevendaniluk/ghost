@@ -8,7 +8,7 @@
 
 #include <ros/ros.h>
 #include <ghost/CarControl.h>
-#include <ghost/ServoControl.h>
+#include <ghost/ArduinoControl.h>
 
 //----------------------------------
 
@@ -34,7 +34,7 @@ class Converter {
     
     // Pubs/Subs
     ros::Subscriber car_cmd_sub_;
-    ros::Publisher servo_cmd_pub_;
+    ros::Publisher arduino_cmd_pub_;
     
     void cmdCarCallback(const ghost::CarControl& msg);
     void convertToServo();
@@ -69,10 +69,10 @@ void Converter::convertToServo() {
 
 void Converter::publishServo() {
   // Publish steering and throttle on cmd_servo topic
-  ghost::ServoControl msg;
+  ghost::ArduinoControl msg;
   msg.steering = steering_;
   msg.throttle = throttle_;
-  servo_cmd_pub_.publish(msg);
+  arduino_cmd_pub_.publish(msg);
 }// end convertToServo
 
 
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
   converter.car_cmd_sub_ = nh.subscribe("cmd_car", 1000, 
                                 &Converter::cmdCarCallback, &converter);
   // Setup publisher of cmd_servo messages
-  converter.servo_cmd_pub_ = nh.advertise<ghost::ServoControl>("cmd_servo", 1000);
+  converter.arduino_cmd_pub_ = nh.advertise<ghost::ArduinoControl>("cmd_arduino", 1000);
   
   // Set centre positions and publish
   converter.steering_ = converter.steering_centre_pwm_;

@@ -16,7 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   CarControl.msg
-  ServoControl.msg
+  ArduinoControl.msg
 )
 
 generate_messages(
