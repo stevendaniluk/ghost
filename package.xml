@@ -7,7 +7,8 @@
   <maintainer email="stevendaniluk8@gmail.com">Steven Daniluk</maintainer>
   <license>BSD</license>
   <author email="stevendaniluk8@gmail.com">Steven Daniluk</author>
-
+  
+  <!-- Declaration of nodelet plugin -->
   <export>
     <nodelet plugin="${prefix}/nodelet_plugins.xml" />
   </export>

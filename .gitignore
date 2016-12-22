@@ -1,17 +1,2 @@
-# Contents of bagfiles
-bagfiles/*
-!bagfiles/placeholder.txt
-
-# Road classifier datasets and logs
-road_classifier/datasets/*
-!road_classifier/datasets/placeholder.txt
-!road_classifier/datasets/bad_label_scanner.py
-
-road_classifier/logs/*
-!road_classifier/logs/placeholder.txt
-
-road_classifier/trained_models/*
-!road_classifier/trained_models/placeholder.txt
-
 # Python .pyc files
 *.pyc

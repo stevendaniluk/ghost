@@ -35,21 +35,23 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-## Declare C++ executables
+# Keyboard teleop executable
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)
-add_executable(teleop_ps3 src/teleop_ps3.cpp)
-add_executable(car_to_servo_converter src/car_to_servo_converter.cpp)
-add_executable(camera_frame_grabber src/camera_frame_grabber.cpp)
-
-# Declare the dependencies
 add_dependencies(teleop_keyboard ghost_generate_messages_cpp)
-add_dependencies(teleop_ps3 ghost_generate_messages_cpp)
-add_dependencies(car_to_servo_converter ghost_generate_messages_cpp)
-
-# Specify libraries
 target_link_libraries(teleop_keyboard ${catkin_LIBRARIES})
+
+# PS3 teleop executable
+add_executable(teleop_ps3 src/teleop_ps3.cpp)
+add_dependencies(teleop_ps3 ghost_generate_messages_cpp)
 target_link_libraries(teleop_ps3 ${catkin_LIBRARIES})
+
+# Car-to-Servo Converter executable
+add_executable(car_to_servo_converter src/car_to_servo_converter.cpp)
+add_dependencies(car_to_servo_converter ghost_generate_messages_cpp)
 target_link_libraries(car_to_servo_converter ${catkin_LIBRARIES})
+
+# Executable for saving camera images
+add_executable(camera_frame_grabber src/camera_frame_grabber.cpp)
 target_link_libraries(camera_frame_grabber ${catkin_LIBRARIES})
 
 # Nodelet library
