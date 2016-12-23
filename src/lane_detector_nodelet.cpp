@@ -84,11 +84,13 @@ class LaneDetector : public nodelet::Nodelet {
   image_transport::Publisher pub_edges_;           // Image with edges
 
   // BEV image properties
-  double v_max_depth_;  // Pixel height for max range (for cropping and indexing image)
-  int bev_w_;           // BEV image width
-  int bev_h_;           // BEV image height
-  double mpp_;          // BEV meter-per-pixel
-  cv::Mat M_;           // BEV transformation matrix
+  double Z_bottom_pixel_;   // Real world depth at the bottom pixel row
+  int cropped_w_;           // Width of the cropped image
+  int cropped_h_;           // Height of the cropped image
+  int bev_w_;               // BEV image width
+  int bev_h_;               // BEV image height
+  double mpp_;              // BEV meter-per-pixel
+  cv::Mat M_;               // BEV transformation matrix
 
   // Scaner properties
   int scan_num_points_;                     // Total number of scan points
@@ -105,7 +107,7 @@ class LaneDetector : public nodelet::Nodelet {
   double max_range_;             // Maximum range of camera/scan
   double min_range_;             // Minimum range of camera/scan
   double scan_angle_increment_;  // Angle between scans
-  std::string scan_frame_id_;   // Name of the frame to attach to the scan message
+  std::string scan_frame_id_;    // Name of the frame to attach to the scan message
 
   // Image filtering parameters (loaded from parameter server)
   double clahe_clip_limit_;      // Clipping limit for CLAHE histogram equalization
@@ -202,7 +204,7 @@ class LaneDetector : public nodelet::Nodelet {
 
     // Crop the input (apply ROI to the source image, to avoiding copy the unused area)
     const cv::Mat source = cv_bridge::toCvShare(image_msg, sensor_msgs::image_encodings::MONO8)->image;
-    cv::Rect crop_ROI(0, v_max_depth_, image_msg->width, image_msg->height - v_max_depth_);
+    cv::Rect crop_ROI(0, image_msg->height - cropped_h_, image_msg->width, cropped_h_);
     cv::Mat image = source(cv::Rect(crop_ROI));
 
     // Convert to grayscale if necessary
@@ -282,7 +284,7 @@ class LaneDetector : public nodelet::Nodelet {
           cv::Point hit = iter.pos();
 
           x = (hit.x - 0.5*bev_w_)*mpp_;
-          y = (bev_h_ - hit.y)*mpp_;
+          y = (bev_h_ - hit.y)*mpp_ + Z_bottom_pixel_;
 
           scan.ranges[j] = sqrt(pow(x, 2) + pow(y, 2));
           break;
@@ -321,19 +323,20 @@ class LaneDetector : public nodelet::Nodelet {
     double h_og = info_msg->height;
 
     // Find pixel height for max depth (for cropping and indexing image)
-    v_max_depth_ = fp_h*(cam_Y_/max_range_) + v_o;
+    double v_max_depth = fp_h*(cam_Y_/max_range_) + v_o;
 
     // Set the (cropped) image size
-    double w = w_og;
-    double h = int(h_og - v_max_depth_) + 1;
+    cropped_w_ = w_og;
+    cropped_h_ = int(h_og - v_max_depth) + 1;
 
     // Find world width at the bottom of the image, then find the L and R pixel
     // positions with that same world width but at depth max_range_.
     // These will be used for the homography.
+    Z_bottom_pixel_ = fp_h*cam_Y_/(h_og - v_o);
     double X_low_l = cam_Y_*(fp_h/fp_w)*(0.0 - u_o)/(h_og - 1.0 - v_o);
     double X_low_r = cam_Y_*(fp_h/fp_w)*(w_og - 1.0 - u_o)/(h_og - 1.0 - v_o);
-    double u_high_l = (X_low_l/cam_Y_)*(v_max_depth_ - v_o)*(fp_w/fp_h) + u_o;
-    double u_high_r = (X_low_r/cam_Y_)*(v_max_depth_ - v_o)*(fp_w/fp_h) + u_o;
+    double u_high_l = (X_low_l/cam_Y_)*(v_max_depth - v_o)*(fp_w/fp_h) + u_o;
+    double u_high_r = (X_low_r/cam_Y_)*(v_max_depth - v_o)*(fp_w/fp_h) + u_o;
 
     // Compute the meters-per-pixel for the BEV image
     double delta_X = X_low_r - X_low_l;
@@ -350,8 +353,8 @@ class LaneDetector : public nodelet::Nodelet {
     std::vector<cv::Point2f> src(4);
     src[0] = cv::Point2f(u_high_l, 0);
     src[1] = cv::Point2f(u_high_r, 0);
-    src[2] = cv::Point2f(w - 1, h - 1);
-    src[3] = cv::Point2f(0, h - 1);
+    src[2] = cv::Point2f(cropped_w_ - 1, cropped_h_ - 1);
+    src[3] = cv::Point2f(0, cropped_h_ - 1);
 
     std::vector<cv::Point2f> dst(4);
     dst[0] = cv::Point2f(0, 0);
@@ -364,20 +367,21 @@ class LaneDetector : public nodelet::Nodelet {
 
     // Use the BEV image resolution to determine the output size
     // BEV width will be limited by either the max range, or the FOV
+    // (add some margin to the FOV limit to account for uncentred sensors)
     bev_h_ = int(max_range_/mpp_);
-    double fov_max_w = (bev_h_*w_og)/fp_w + 0.5*dst_w;
+    double fov_max_w = 1.1*((bev_h_*w_og)/fp_w + 0.5*dst_w);
     bev_w_ = int(std::min(2*max_range_/mpp_, fov_max_w));
 
     // Rotation about the X-axis to account for camera angle
     // (have to add translations to rotate about the centre)
     cv::Mat Rx_T1 = (cv::Mat_<double>(3, 3) <<
-              1.0, 0.0, -w/2,
-              0.0, 1.0, -h/2,
-              0.0, 0.0,  1.0);
+              1.0, 0.0, -cropped_w_/2,
+              0.0, 1.0, -cropped_h_/2,
+              0.0, 0.0,      1.0);
     cv::Mat Rx_T2 = (cv::Mat_<double>(3, 3) <<
-              1.0, 0.0, w/2,
-              0.0, 1.0, h/2,
-              0.0, 0.0, 1.0);
+              1.0, 0.0, cropped_w_/2,
+              0.0, 1.0, cropped_h_/2,
+              0.0, 0.0,      1.0);
 
     double alpha = cam_angle_*PI/180.0;
     cv::Mat Rx = (cv::Mat_<double>(3, 3) <<
@@ -388,8 +392,8 @@ class LaneDetector : public nodelet::Nodelet {
     cv::Mat R = Rx_T2*Rx*Rx_T1;
 
     // Translation to centre the image and shift to the bottom
-    double x_offset = (bev_w_ - dst_w)/2;
-    double y_offset = 0;
+    double x_offset = (bev_w_ - dst_w)/2.0;
+    double y_offset = 1;
     cv::Mat T = (cv::Mat_<double>(3, 3) <<
               1.0, 0.0, x_offset,
               0.0, 1.0, y_offset,
@@ -397,7 +401,7 @@ class LaneDetector : public nodelet::Nodelet {
 
     // Form the full transformation
     M_ = T*H*R;
-    
+
   }// end initializeTransform
 
   //--------------------------------------
@@ -410,6 +414,11 @@ class LaneDetector : public nodelet::Nodelet {
   void initializeScanner() {
     // TODO: Reformulate to only scan up to the max range, or the edge of the
     // valid area of the BEV image, whichever is closer
+
+    // Form white image and apply transform, this will be used to make the scan lines
+    // only extend within the valid area of the image
+    cv::Mat blank_img = cv::Mat::ones(cv::Size(cropped_w_, cropped_h_), CV_8U)*255;
+    cv::warpPerspective(blank_img, blank_img, M_, cv::Size(bev_w_, bev_h_), cv::BORDER_CONSTANT);
 
     // Set scanner parameters (sweep across the entire image)
     double angle_min = 0.0;
@@ -425,7 +434,7 @@ class LaneDetector : public nodelet::Nodelet {
 
     double x_start, y_start, x_end, y_end, x_comp, y_comp, min_length, max_length, angle;
     max_length = max_range_/mpp_;
-    min_length = min_range_/mpp_;
+    min_length = std::max((min_length - Z_bottom_pixel_)/mpp_, 0.0);
     angle = angle_min + 0.5*scan_angle_increment_;
 
     for(int i = 0; i < scan_num_points_; i++) {
@@ -441,8 +450,19 @@ class LaneDetector : public nodelet::Nodelet {
 
       scan_start_pts_[i] = scan_origin + cv::Point2f(x_start, y_start);
       scan_end_pts_[i] = scan_origin + cv::Point2f(x_end, y_end);
+
+      // Crawl along the line and terminate when the pixel is no longer valid
+      cv::LineIterator iter = cv::LineIterator(blank_img, scan_start_pts_[i], scan_end_pts_[i], 4);
+      for(int j = 0; j < iter.count; j++, iter++){
+        // Check for a zeroed pixel (out of bounds)
+        if (*iter.operator*() == 0) {
+          scan_end_pts_[i] = iter.pos();
+          break;
+        }
+      } 
+      
       angle += scan_angle_increment_;
-    }    
+    }
     
   }// end initializeScanner
 
