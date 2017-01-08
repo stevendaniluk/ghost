@@ -1,8 +1,9 @@
-/* Converts publsihed CarControl messages to ServoControl messages
+/* Converts publsihed CarControl messages to ArduinoControl messages
 
    CarControl messages should be published by either the car controller, or
-   a teleop node. The desired velocity and steering angle are converted to 
-   the appropriate PWM values, which are then published as a ServoControl 
+   a teleop node. Incoming CarControl messages contain the desired steering
+   and throttle values, on the range [-1,1]. These are mapped to the
+   appropriate PWM values, which are then published as an ArduinoControl 
    message to be processed by the arduino node.
 */
 
@@ -15,66 +16,56 @@
 class Converter {
   public:
     // CarControl Message
-    float steering_angle_;
-    float steering_rate_;
-    float velocity_;
-    float acceleration_;
     ros::Time msg_receive_time_;
     
-    // ServoControl Message [PWM]
-    int steering_;
-    int throttle_;
+    // ArduinoControl Message [PWM]
+    int steering_pwm_;
+    int throttle_pwm_;
     
     // Car parameters
     int steering_centre_pwm_;
+    int steering_max_pwm_;
+    int steering_min_pwm_;
     int throttle_centre_pwm_;
     int throttle_max_pwm_;
-    int pwm_per_degree_;
-    double vel_max_;
+    int throttle_min_pwm_;
     
     // Pubs/Subs
     ros::Subscriber car_cmd_sub_;
     ros::Publisher arduino_cmd_pub_;
     
     void cmdCarCallback(const ghost::CarControl& msg);
-    void convertToServo();
     void publishServo();
 
 };// end Converter
 
 void Converter::cmdCarCallback(const ghost::CarControl& msg) {
-  steering_angle_ = msg.steering_angle;
-  steering_rate_ = msg.steering_rate;
-  velocity_ = msg.velocity;
-  acceleration_ = msg.acceleration;
+  // Record when the message was received, for timeout purposes
   msg_receive_time_ = msg.header.stamp;
-  
-  convertToServo();
+
+  // Convert from [-1,1] to PWM values
+  if(msg.steering >= 0) {
+    steering_pwm_ = steering_centre_pwm_ + int(msg.steering*(steering_max_pwm_ - steering_centre_pwm_));
+  }else {
+    steering_pwm_ = steering_centre_pwm_ + int(msg.steering*(steering_centre_pwm_ - steering_min_pwm_));
+  }
+  if(msg.throttle >= 0) {
+    throttle_pwm_ = throttle_centre_pwm_ + int(msg.throttle*(throttle_max_pwm_ - throttle_centre_pwm_));
+  }else {
+    throttle_pwm_ = throttle_centre_pwm_ + int(msg.throttle*(throttle_centre_pwm_ - throttle_min_pwm_));
+  }
+
+  // Publish commands
   publishServo();
 }// end callback
 
-void Converter::convertToServo() {
-  // Convert from angles to PWM
-  steering_ = steering_centre_pwm_ + steering_angle_*pwm_per_degree_;
-  if (acceleration_ < 0) {
-    // Braking
-    throttle_ =  (1 + acceleration_)*throttle_centre_pwm_;
-  } else {
-    // Positive throttle command
-    throttle_ = throttle_centre_pwm_ + 
-              (velocity_/vel_max_)*(throttle_max_pwm_ - throttle_centre_pwm_);
-  }
-  
-}// end convertToServo
-
 void Converter::publishServo() {
-  // Publish steering and throttle on cmd_servo topic
+  // Publish steering and throttle on cmd_arduino topic
   ghost::ArduinoControl msg;
-  msg.steering = steering_;
-  msg.throttle = throttle_;
+  msg.steering = steering_pwm_;
+  msg.throttle = throttle_pwm_;
   arduino_cmd_pub_.publish(msg);
 }// end convertToServo
-
 
 int main(int argc, char **argv) {
   // Initialize
@@ -88,20 +79,21 @@ int main(int argc, char **argv) {
   
   // Get relevant parameters
   nh.param("steering_centre_pwm", converter.steering_centre_pwm_, 127);
+  nh.param("steering_max_pwm", converter.steering_max_pwm_, 255);
+  nh.param("steering_min_pwm", converter.steering_min_pwm_, 0);
   nh.param("throttle_centre_pwm", converter.throttle_centre_pwm_, 127);
   nh.param("throttle_max_pwm", converter.throttle_max_pwm_, 255);
-  nh.param("pwm_per_degree", converter.pwm_per_degree_, 1);
-  nh.param("vel_max", converter.vel_max_, 10.0);
+  nh.param("throttle_min_pwm", converter.throttle_min_pwm_, 0);
   
   // Subscribe to cmd_car messsages with converter callback
   converter.car_cmd_sub_ = nh.subscribe("cmd_car", 1000, 
                                 &Converter::cmdCarCallback, &converter);
-  // Setup publisher of cmd_servo messages
+  // Setup publisher of ArduinoControl messages
   converter.arduino_cmd_pub_ = nh.advertise<ghost::ArduinoControl>("cmd_arduino", 1000);
   
   // Set centre positions and publish
-  converter.steering_ = converter.steering_centre_pwm_;
-  converter.throttle_ = converter.throttle_centre_pwm_;
+  converter.steering_pwm_ = converter.steering_centre_pwm_;
+  converter.throttle_pwm_ = converter.throttle_centre_pwm_;
   converter.msg_receive_time_ = ros::Time::now();
   converter.publishServo();
   
@@ -115,8 +107,8 @@ int main(int argc, char **argv) {
     if (ros::Time::now() > loop_timer + ros::Duration(0.2)) {
       loop_timer = ros::Time::now();
       if (converter.msg_receive_time_ < (ros::Time::now() - ros::Duration(1.0))) {
-        converter.steering_ = converter.steering_centre_pwm_;
-        converter.throttle_ = converter.throttle_centre_pwm_;
+        converter.steering_pwm_ = converter.steering_centre_pwm_;
+        converter.throttle_pwm_ = converter.throttle_centre_pwm_;
         converter.publishServo();
       }
     }

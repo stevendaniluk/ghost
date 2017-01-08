@@ -26,11 +26,7 @@ class Teleop {
   public:
     Teleop();
     void keyLoop();
-    
-    // For holding loaded parameters
-    float vel_max_;
-    float max_steering_angle_;
-    
+        
     // Message to be published
     ghost::CarControl msg;
 
@@ -41,11 +37,7 @@ class Teleop {
 };// end class
 
 // Constructor
-Teleop::Teleop() {
-  // Get relevant parameters
-  nh_.param("vel_max", vel_max_, 10.0f);
-  nh_.param("max_steering_angle", max_steering_angle_, 40.0f);
-  
+Teleop::Teleop() {  
   // Setup publisher
   car_control_pub_ = nh_.advertise<ghost::CarControl>("cmd_car", 1, true);
 }
@@ -59,9 +51,8 @@ void Teleop::keyLoop() {
   char key;
   bool unknown_key = false;
   
-  float steering_angle = 0;
-  float velocity = 0;
-  float current_vel_max = vel_max_;
+  float steering = 0;
+  float throttle = 0;
 
   // Get the console in raw mode                          
   tcgetattr(kfd, &cooked);
@@ -83,13 +74,11 @@ void Teleop::keyLoop() {
   puts("Reading from keyboard");
   puts("Use arrow keys to move the car.");
   puts(" ");
-  puts("Up Arrow = Increase Velocity");
-  puts("Down Arrow = Decrease Velocity");
-  puts("Left Arrow = Increment Steering Angle Left");
-  puts("Right Arrow = Increment Steering Angle Right");
-  puts("Space Bar = Set Velocity To Zero");
-  puts("Q = Increase Max Velocity By 0.2m/s");
-  puts("A = Decrease Max Velocity By 0.2m/s");
+  puts("Up Arrow = Increment Throttle Up");
+  puts("Down Arrow = Increment Throttle Down");
+  puts("Left Arrow = Increment Steering Left");
+  puts("Right Arrow = Increment Steering Right");
+  puts("Space Bar = Set Throttle To Zero");
   puts(" ");
   
   // Set precision for printing max velocity
@@ -126,29 +115,19 @@ void Teleop::keyLoop() {
     unknown_key = false;
     switch(key) {
       case KEYCODE_L:
-        steering_angle -= 3;
+        steering -= 0.1;
         break;
       case KEYCODE_R:
-        steering_angle += 3;
+        steering += 0.1;
         break;
       case KEYCODE_U:
-        velocity += 0.5;
+        throttle += 0.05;
         break;
       case KEYCODE_D:
-        velocity -= 0.5;
+        throttle -= 0.05;
         break;
       case KEYCODE_S:
-  	velocity = 0;
-        break;
-      case KEYCODE_Q:
-        current_vel_max += 0.2;
-        current_vel_max = std::min(current_vel_max, vel_max_);
-        std::cout << "Max Velocity=" << current_vel_max << std::endl;
-        break;
-      case KEYCODE_A:
-        current_vel_max -= 0.2;
-        current_vel_max = std::max(current_vel_max, 0.0f);
-        std::cout << "Max Velocity=" << current_vel_max << std::endl;
+  	    throttle = 0;
         break;
       default:
         unknown_key = true;
@@ -161,15 +140,15 @@ void Teleop::keyLoop() {
       tcflush(kfd, TCIFLUSH);
       
       // Make sure steering is within bounds
-      steering_angle = std::min(steering_angle, max_steering_angle_);
-      steering_angle = std::max(steering_angle, -max_steering_angle_);
+      steering = std::min(steering, 1.0f);
+      steering = std::max(steering, -1.0f);
       
-      // Make sure velocity is within bounds
-      velocity = std::min(velocity, current_vel_max);
-      velocity = std::max(velocity, 0.0f);
+      // Make sure throttle is within bounds
+      throttle = std::min(throttle, 1.0f);
+      throttle = std::max(throttle, -1.0f);
       
-      msg.steering_angle = steering_angle;
-      msg.velocity = velocity;
+      msg.steering = steering;
+      msg.throttle = throttle;
     }// end unknown_key if
     
     // Publish at desired frequency
@@ -177,7 +156,7 @@ void Teleop::keyLoop() {
       prev_pub_time = ros::Time::now();
       msg.header.stamp = ros::Time::now();
       car_control_pub_.publish(msg);
-      ROS_DEBUG("Vel=%.2f, Angle=%.2f", velocity, steering_angle);
+      ROS_DEBUG("Steering=%.2f, Throttle=%.2f", steering, throttle);
     }
     
   }// end while

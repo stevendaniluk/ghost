@@ -28,10 +28,6 @@ class Teleop {
     ros::Publisher car_control_pub_;
     ros::Subscriber joy_sub_;
     
-    // For holding loaded parameters
-    double vel_max_;
-    double max_steering_angle_;
-    
     // Message to be published
     ghost::CarControl msg_;
     bool publish_once_;
@@ -55,11 +51,7 @@ Teleop::Teleop() {
   gas_trigger_ = 13;
   brake_trigger_ = 12;
   steering_axis_ = 0;
-  
-  // Get relevant parameters
-  nh_.param("vel_max", vel_max_, 10.0);
-  nh_.param("max_steering_angle", max_steering_angle_, 40.0);
-  
+    
   // Setup pubs and subs
   joy_sub_ = nh_.subscribe<sensor_msgs::Joy>("joy", 10, &Teleop::joyCallback, this);
   car_control_pub_ = nh_.advertise<ghost::CarControl>("cmd_car", 1, true);
@@ -69,10 +61,9 @@ Teleop::Teleop() {
 }
 
 // Read in the joystick data
-void Teleop::joyCallback(const sensor_msgs::Joy::ConstPtr& joy) {   
-  msg_.velocity = -joy->axes[gas_trigger_] * vel_max_;
-  msg_.acceleration = joy->axes[brake_trigger_];
-  msg_.steering_angle = -joy->axes[steering_axis_] * max_steering_angle_;
+void Teleop::joyCallback(const sensor_msgs::Joy::ConstPtr& joy) {  
+  msg_.steering = -joy->axes[steering_axis_]; 
+  msg_.throttle = -joy->axes[gas_trigger_] - joy->axes[brake_trigger_];
 }
 
 // Publish the message at a fixed rate (but don't keep publishing zero messages)
@@ -80,7 +71,7 @@ void Teleop::publish() {
   boost::mutex::scoped_lock lock(publish_mutex_);
   
   msg_.header.stamp = ros::Time::now();
-  if (msg_.velocity == 0 && msg_.acceleration == 0 && msg_.steering_angle == 0) {
+  if (msg_.steering == 0 && msg_.throttle == 0) {
     // Publish once zero message, then stop
     if (publish_once_) {
       car_control_pub_.publish(msg_);
@@ -90,6 +81,7 @@ void Teleop::publish() {
     // There are controls to publish
     car_control_pub_.publish(msg_);
     publish_once_ = true;
+    ROS_DEBUG("Steering=%.2f, Throttle=%.2f", msg_.steering, msg_.throttle);
   }
 }
 

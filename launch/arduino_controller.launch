@@ -13,7 +13,7 @@
     pkg="ghost"
     type="car_to_servo_converter"
     name="car_to_servo_converter_node"
-    ns="GhostController"
+    ns="ghost_controller"
   />
   
   <!-- rosserial node 
@@ -27,7 +27,7 @@
     type="serial_node.py"
     name="arduino_serial"
     args="/dev/ttyUSB0"
-    ns="GhostController"
+    ns="ghost_controller"
   />
 
   <!-- Load URDF file -->

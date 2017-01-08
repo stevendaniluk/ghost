@@ -8,7 +8,7 @@
     type="teleop_ps3"
     name="teleop_ps3_node"
     output="screen"
-    ns="GhostController"
+    ns="ghost_controller"
   />
   
   <!-- Node for reading inputs from PS3 controller -->
@@ -16,7 +16,7 @@
     pkg="joy" 
     type="joy_node" 
     name="joystick"
-    ns="GhostController"
+    ns="ghost_controller"
   />
   
 </launch>
