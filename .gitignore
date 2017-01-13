@@ -1,2 +1,5 @@
 # Python .pyc files
 *.pyc
+
+# Jetbrains files
+.idea/*
