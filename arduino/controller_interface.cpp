@@ -82,41 +82,15 @@ volatile uint16_t steering_override;
 volatile uint16_t throttle_override;
 
 //--------------------------------------------------
-
-// Steering command callback for messages from the controller
-void cmdInCallback(const ghost::ArduinoControl& msg) {
-  steering_ctrl = msg.steering;
-  throttle_ctrl = msg.throttle;
-}
-
-// Check input servo pin for override activity
-void checkOverride() {
-  // Check the override value
-  if(override_flag) {
-    if(override_in_shared < 1500) {
-      override_active = false;
-    }else {
-      override_active = true;
-    }
-  }
-  
-  // Attach/dettach the steering and throttle interrupts 
-  // (don't need them running when override not in use)
-  if (override_active) {
-    // This is the start of an override, attach interrupts
-    PCintPort::attachInterrupt(STEERING_IN_PIN, getSteering, CHANGE); 
-    PCintPort::attachInterrupt(THROTTLE_IN_PIN, getThrottle, CHANGE);
-  }else if (!override_active && prev_override_active) {
-    // This is the end of an override, dettachinterrupts
-    PCintPort::detachInterrupt(STEERING_IN_PIN);
-    PCintPort::detachInterrupt(THROTTLE_IN_PIN);
-  }
-  prev_override_active = override_active;
-}// end checkOverride
-
+void cmdInCallback(const ghost::ArduinoControl& msg);
+void checkOverride();
+void getSteering();
+void getThrottle();
+void getOverride();
+void getRPM();
 //--------------------------------------------------
 
-ros::NodeHandle  nh;
+ros::NodeHandle nh;
 
 // Setup subscribers
 ros::Subscriber<ghost::ArduinoControl> cmd_in_sub("cmd_arduino", cmdInCallback);
@@ -126,8 +100,9 @@ ghost::ArduinoControl cmd_out_msg;
 ros::Publisher cmd_out_pub("cmd_arduino_executed", &cmd_out_msg);
 
 void setup(){
+  nh.getHardware()->setBaud(115200);
   nh.initNode();
-  
+    
   nh.subscribe(cmd_in_sub);
   nh.advertise(cmd_out_pub);
   
@@ -219,7 +194,7 @@ void loop() {
     float new_reading = rpm_readings[rpm_index];
     float oldest_reading = rpm_readings[oldest_index];
     cmd_out_msg.motor_rpm = cmd_out_msg.motor_rpm + new_reading/rpm_avg_n - oldest_reading/rpm_avg_n;
-
+    
     // Update the readings index
     rpm_index++;
     if(rpm_index == rpm_avg_n)
@@ -228,12 +203,42 @@ void loop() {
     // Publish the message
     cmd_out_msg.header.stamp = nh.now();
     cmd_out_pub.publish(&cmd_out_msg);
-    
   }
   
 }// end main
 
 //--------------------------------------------------
+
+// Steering command callback for messages from the controller
+void cmdInCallback(const ghost::ArduinoControl& msg) {
+  steering_ctrl = msg.steering;
+  throttle_ctrl = msg.throttle;
+}
+
+// Check input servo pin for override activity
+void checkOverride() {
+  // Check the override value
+  if(override_flag) {
+    if(override_in_shared < 1500) {
+      override_active = false;
+    }else {
+      override_active = true;
+    }
+  }
+  
+  // Attach/dettach the steering and throttle interrupts 
+  // (don't need them running when override not in use)
+  if (override_active) {
+    // This is the start of an override, attach interrupts
+    PCintPort::attachInterrupt(STEERING_IN_PIN, getSteering, CHANGE); 
+    PCintPort::attachInterrupt(THROTTLE_IN_PIN, getThrottle, CHANGE);
+  }else if (!override_active && prev_override_active) {
+    // This is the end of an override, dettachinterrupts
+    PCintPort::detachInterrupt(STEERING_IN_PIN);
+    PCintPort::detachInterrupt(THROTTLE_IN_PIN);
+  }
+  prev_override_active = override_active;
+}// end checkOverride
 
 // Steering interrupt service routine
 void getSteering() {
@@ -282,4 +287,3 @@ void getRPM() {
   // Simply need to count the pulses
   rpm_pulses_shared++;
 }
-

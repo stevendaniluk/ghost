@@ -27,8 +27,9 @@
     type="serial_node.py"
     name="arduino_serial"
     args="/dev/ttyUSB0"
-    ns="ghost_controller"
-  />
+    ns="ghost_controller">
+      <param name="baud" value="115200"/>
+  </node>
 
   <!-- Load URDF file -->
   <include file="$(find ghost)/launch/includes/state_publisher.launch.xml" />

@@ -8,6 +8,8 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   nodelet
   roscpp
+  rosserial_arduino
+  rosserial_client
   sensor_msgs
   std_msgs
 )
@@ -34,6 +36,20 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
+
+# Library generation for Arduino
+rosserial_generate_ros_lib(
+  PACKAGE rosserial_arduino
+  SCRIPT make_libraries.py
+)
+
+# Arduino target setup
+rosserial_configure_client(
+  DIRECTORY arduino
+  TOOLCHAIN_FILE ${ROSSERIAL_ARDUINO_TOOLCHAIN}
+)
+rosserial_add_client_target(arduino controller_interface ALL)
+rosserial_add_client_target(arduino controller_interface-upload)
 
 # Keyboard teleop executable
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)
