@@ -147,7 +147,7 @@ void setup(){
   
   // Attach interrupt to read override and rpm signals
   PCintPort::attachInterrupt(OVERRIDE_PIN, getOverride, CHANGE);
-  PCintPort::attachInterrupt(RPM_PIN, getRPM, RISING);
+  PCintPort::attachInterrupt(RPM_PIN, getRPM, CHANGE);
 
 }// end setup
 
@@ -185,9 +185,10 @@ void loop() {
 
     // Determine motor RPM from the pulses since the last message
     // and add it to the array of readings
+    // (must divide by two, since each interrupt is 1/2 of a rotation)
     unsigned long rpm_pulses = rpm_pulses_shared;
     rpm_pulses_shared = 0;
-    rpm_readings[rpm_index] = float(rpm_pulses*60)/(float(pub_freq)/float(1000));
+    rpm_readings[rpm_index] = (0.5f*float(rpm_pulses)*60.0f)/(float(pub_freq)/1000.0f);
 
     // Compute the RPM moving average
     uint8_t oldest_index = (rpm_index + 1)%rpm_avg_n;
@@ -285,5 +286,6 @@ void getOverride() {
 // RPM interrupt service routine
 void getRPM() {
   // Simply need to count the pulses
+  // Signal changes from high to low every 1/2 turn
   rpm_pulses_shared++;
 }
