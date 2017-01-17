@@ -42,6 +42,7 @@ rosserial_generate_ros_lib(
   PACKAGE rosserial_arduino
   SCRIPT make_libraries.py
 )
+add_dependencies(${PROJECT_NAME}_ros_lib ${PROJECT_NAME}_generate_messages_cpp)
 
 # Arduino target setup
 rosserial_configure_client(
@@ -53,17 +54,17 @@ rosserial_add_client_target(arduino controller_interface-upload)
 
 # Keyboard teleop executable
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)
-add_dependencies(teleop_keyboard ghost_generate_messages_cpp)
+add_dependencies(teleop_keyboard ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(teleop_keyboard ${catkin_LIBRARIES})
 
 # PS3 teleop executable
 add_executable(teleop_ps3 src/teleop_ps3.cpp)
-add_dependencies(teleop_ps3 ghost_generate_messages_cpp)
+add_dependencies(teleop_ps3 ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(teleop_ps3 ${catkin_LIBRARIES})
 
 # Car-to-Servo Converter executable
 add_executable(car_to_servo_converter src/car_to_servo_converter.cpp)
-add_dependencies(car_to_servo_converter ghost_generate_messages_cpp)
+add_dependencies(car_to_servo_converter ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(car_to_servo_converter ${catkin_LIBRARIES})
 
 # Executable for saving camera images
