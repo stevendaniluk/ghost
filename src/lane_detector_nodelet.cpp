@@ -196,15 +196,17 @@ class LaneDetector : public nodelet::Nodelet {
     if (!initialized_){
       // Need tf data to get camera height and angle
       // (transform assumed to be constant)
+      std::string camera_frame = image_msg->header.frame_id;
       try{
-        tf_listener_.waitForTransform("/base_footprint", "/" + scan_frame_id_, image_msg->header.stamp, ros::Duration(5.0));
-        tf_listener_.lookupTransform("/base_footprint", "/" + scan_frame_id_, ros::Time(0), cam_tf_);
+        tf_listener_.waitForTransform("/base_footprint", "/" + camera_frame, image_msg->header.stamp, ros::Duration(5.0));
+        tf_listener_.lookupTransform("/base_footprint", "/" + camera_frame, ros::Time(0), cam_tf_);
         cam_Y_ = cam_tf_.getOrigin().z();
         tf::Quaternion cam_quat = cam_tf_.getRotation();
         double roll_throwaway, yaw_throwaway;
         tf::Matrix3x3(cam_quat).getRPY(roll_throwaway, cam_angle_, yaw_throwaway);
+        NODELET_DEBUG("Got tf data: cam_Y_=%.2f, cam_angle_=%.2f", cam_Y_, cam_angle_);
       }catch (tf::TransformException &ex) {
-        NODELET_WARN("Waiting for tf data between /base_footprint and /%s.", scan_frame_id_.c_str());
+        NODELET_WARN("Waiting for tf data between /base_footprint and /%s.", camera_frame.c_str());
         return;
       }
       
@@ -326,16 +328,19 @@ class LaneDetector : public nodelet::Nodelet {
   *    *-----------*               *-*
   */
   void initializeTransform(const sensor_msgs::CameraInfoConstPtr& info_msg) {
+    NODELET_DEBUG("Initializing the BEV transform");
+    
     // Get the camera parameters
     double fp_w = info_msg->K[0];
     double fp_h = info_msg->K[4];
     double u_o = info_msg->K[2];
     double v_o = info_msg->K[5];
-    double w_og = info_msg->width;
-    double h_og = info_msg->height;
-
+    int w_og = info_msg->width;
+    int h_og = info_msg->height;
+    
     // Find pixel height for max depth (for cropping and indexing image)
     double v_max_depth = fp_h*(cam_Y_/max_range_) + v_o;
+    NODELET_DEBUG("Pixel row at max depth: %.2f", v_max_depth);
 
     // Set the (cropped) image size
     cropped_w_ = w_og;
@@ -349,11 +354,14 @@ class LaneDetector : public nodelet::Nodelet {
     double X_low_r = cam_Y_*(fp_h/fp_w)*(w_og - 1.0 - u_o)/(h_og - 1.0 - v_o);
     double u_high_l = (X_low_l/cam_Y_)*(v_max_depth - v_o)*(fp_w/fp_h) + u_o;
     double u_high_r = (X_low_r/cam_Y_)*(v_max_depth - v_o)*(fp_w/fp_h) + u_o;
-
+    
+    NODELET_DEBUG("World depth at bottom pixel: %.2f", Z_bottom_pixel_);    
+    
     // Compute the meters-per-pixel for the BEV image
     double delta_X = X_low_r - X_low_l;
     double delta_u = u_high_r - u_high_l;
     mpp_ = delta_X/delta_u;
+    NODELET_DEBUG("Meters-per-pixel=%.5f", mpp_);
 
     // New width well be equal to original image width at max depth, but height
     // will be scaled to match resolution
@@ -424,9 +432,8 @@ class LaneDetector : public nodelet::Nodelet {
   * of the BEV image (i.e. middle of the bottom row)
   */
   void initializeScanner() {
-    // TODO: Reformulate to only scan up to the max range, or the edge of the
-    // valid area of the BEV image, whichever is closer
-
+    NODELET_DEBUG("Initializing the scanner");
+    
     // Form white image and apply transform, this will be used to make the scan lines
     // only extend within the valid area of the image
     cv::Mat blank_img = cv::Mat::ones(cv::Size(cropped_w_, cropped_h_), CV_8U)*255;
@@ -440,15 +447,17 @@ class LaneDetector : public nodelet::Nodelet {
     // Create start and end points
     // X and Y components are multiplied by the diagonal size of the image,
     // since the points will clipped to the image boundaries anyways
-    cv::Point2f scan_origin = cv::Point2f(int(bev_w_/2), bev_h_ - 1);
+    cv::Point2f scan_origin = cv::Point2f(bev_w_/2, bev_h_ - 1);
+    NODELET_DEBUG("Scan origin: x=%.2f, y=%.2f", scan_origin.x, scan_origin.y);
+    
     scan_start_pts_.resize(scan_num_points_);
     scan_end_pts_.resize(scan_num_points_);
-
+    
     double x_start, y_start, x_end, y_end, x_comp, y_comp, min_length, max_length, angle;
     max_length = max_range_/mpp_;
-    min_length = std::max((min_length - Z_bottom_pixel_)/mpp_, 0.0);
+    min_length = std::max((min_range_ - Z_bottom_pixel_)/mpp_, 0.0);
     angle = angle_min + 0.5*scan_angle_increment_;
-
+    
     for(int i = 0; i < scan_num_points_; i++) {
       // Set x and y components
       x_comp = cos(angle*PI/180.0);
@@ -471,8 +480,9 @@ class LaneDetector : public nodelet::Nodelet {
           scan_end_pts_[i] = iter.pos();
           break;
         }
-      } 
+      }
       
+      NODELET_DEBUG("Scan %d, Start: x=%.2f y=%.2f, End: x=%.2f y=%.2f", i, scan_start_pts_[i].x, scan_start_pts_[i].y, scan_end_pts_[i].x, scan_end_pts_[i].y);
       angle += scan_angle_increment_;
     }
     

@@ -85,4 +85,15 @@
   <origin rpy="0 ${camera_pitch} 0" xyz="${camera_x} ${camera_y} ${camera_z}"/>
 </joint>
 
+<!-- Scanner from camera -->
+<!-- Origin is on the ground plane directly below the camera -->
+<link name="scanner">
+</link>
+<joint name="scanner_origin" type="fixed">
+  <parent link="camera"/>
+  <child link="scanner"/>
+  <origin rpy="0 ${-camera_pitch} 0" xyz="0 0 ${-camera_z}"/>
+</joint>
+
+
 </robot>
