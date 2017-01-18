@@ -1,6 +1,6 @@
-# Paremeter settings for Ghost controller
+# Parameter settings for Ghost arduino controller
 
-ghost_controller:
+arduino_controller:
 
 # Servo Parameters
   steering_centre_pwm: 100

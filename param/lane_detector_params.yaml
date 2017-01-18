@@ -1,10 +1,6 @@
-# Paremeter settings for Ghost Lane Detector
+# Parameter settings for Ghost lane detector node
 
 lane_detector:
-
-# Camera Parameters
-  cam_height: 0.165     # Height of camera from ground plan [m]
-  cam_angle: 0.02       # Angle of camera about the X axis [Deg]
 
 # Scanner Parameters
   min_range: 0.5           # Minimum detactable range for scanner [m]

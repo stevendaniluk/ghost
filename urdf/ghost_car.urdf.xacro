@@ -1,14 +1,16 @@
 <?xml version="1.0"?>
 <robot name="ghost_car" xmlns:xacro="http://ros.org/wiki/xacro">
 
+<xacro:property name="pi" value="3.1415926536" />
+
 <!-- Car Dimensions -->
-<xacro:property name="length" value=".3" />
-<xacro:property name="width" value=".2" />
-<xacro:property name="height" value=".05" />
+<xacro:property name="wheelbase" value="0.260" />
+<xacro:property name="track_width" value="0.162" />
+<xacro:property name="car_height" value="0.08" />
 
 <!-- Colours -->
 <material name="blue">
-    <color rgba="0 0 .8 1"/>
+    <color rgba="0 0 0.8 1"/>
 </material>
 <material name="black">
   <color rgba="0 0 0 1"/>
@@ -18,37 +20,60 @@
 </material>
 
 <!-- Main body -->
+<link name="base_footprint"/>
 <link name="base_link">
     <visual>
       <geometry>
-        <box size="${length} ${width} ${height}"/>
+        <box size="${wheelbase} ${track_width} ${car_height}"/>
       </geometry>
-      <origin rpy="0 0 0" xyz="0 0 ${.5*height}"/>
+      <origin rpy="0 0 0" xyz="${0.5*wheelbase} 0 ${0.5*car_height}"/>
       <material name="blue"/>
     </visual>
 </link>
+<joint name="base_joint" type="fixed">
+  <origin xyz="0 0 0" rpy="0 0 0" />
+  <parent link="base_footprint"/>
+  <child link="base_link" />
+</joint>
 
 <!-- IMU -->
+<!-- Origin is at the corner with the labeled axis, on the lower surface-->
+<xacro:property name="imu_length" value="0.02" />
+<xacro:property name="imu_width" value="0.03" />
+<xacro:property name="imu_height" value="0.004" />
+<xacro:property name="imu_x" value="0.025" />
+<xacro:property name="imu_y" value="-0.032" />
+<xacro:property name="imu_z" value="0.079" />
+<xacro:property name="imu_yaw" value="0.0" />
+
 <link name="imu">
   <visual>
     <geometry>
-      <box size=".03 .03 .004"/>
+      <box size="${imu_length} ${imu_width} ${imu_height}"/>
     </geometry>
-    <origin rpy="0 0 0" xyz="0 0 0.002"/>
+    <origin rpy="0 0 0" xyz="${0.5*imu_length} ${-0.5*imu_width} ${0.5*imu_height}"/>
     <material name="black"/>
   </visual>
 </link>
 <joint name="imu_mount" type="fixed">
   <parent link="base_link"/>
   <child link="imu"/>
-  <origin xyz="0 0 ${height}"/>
+  <origin rpy="0 0 ${imu_yaw}" xyz="${imu_x} ${imu_y} ${imu_z}"/>
 </joint>
 
 <!-- Camera -->
+<xacro:property name="camera_length" value="0.030" />
+<xacro:property name="camera_width" value="0.029" />
+<xacro:property name="camera_height" value="0.029" />
+<xacro:property name="camera_x" value="0.15" />
+<xacro:property name="camera_y" value="0" />
+<xacro:property name="camera_z" value="0.165" />
+<xacro:property name="camera_pitch" value="0.02" />
+
 <link name="camera">
   <visual>
     <geometry>
-      <box size=".04 .04 .04"/>
+      <box size="${camera_length} ${camera_width} ${camera_height}"/>
     </geometry>
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <material name="white"/>
@@ -57,7 +82,7 @@
 <joint name="camera_mount" type="fixed">
   <parent link="base_link"/>
   <child link="camera"/>
-  <origin xyz="${.5*length - 0.02} 0 ${height + 0.02}"/>
+  <origin rpy="0 ${camera_pitch} 0" xyz="${camera_x} ${camera_y} ${camera_z}"/>
 </joint>
 
 </robot>

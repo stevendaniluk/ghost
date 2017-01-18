@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rosserial_client
   sensor_msgs
   std_msgs
+  tf
 )
 
 ## Declare custom messages
@@ -49,7 +50,7 @@ rosserial_configure_client(
   DIRECTORY arduino
   TOOLCHAIN_FILE ${ROSSERIAL_ARDUINO_TOOLCHAIN}
 )
-rosserial_add_client_target(arduino controller_interface ALL)
+rosserial_add_client_target(arduino controller_interface)
 rosserial_add_client_target(arduino controller_interface-upload)
 
 # Keyboard teleop executable

@@ -20,7 +20,7 @@
 
   <!-- Load the parameters -->
   <rosparam 
-      file="$(find ghost)/param/ghost_lane_detector.yaml" 
+      file="$(find ghost)/param/lane_detector_params.yaml"
       command="load"/>
 
 </launch>

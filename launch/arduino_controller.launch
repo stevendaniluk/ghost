@@ -4,32 +4,32 @@
   
   <!-- Load the controller parameters -->
   <rosparam 
-      file="$(find ghost)/param/ghost_controller.yaml" 
+      file="$(find ghost)/param/arduino_controller_params.yaml"
       command="load" 
   />
   
-  <!-- Node for converter CarControl messages to ServoControl messages -->
-  <node
-    pkg="ghost"
-    type="car_to_servo_converter"
-    name="car_to_servo_converter_node"
-    ns="ghost_controller"
-  />
-  
-  <!-- rosserial node 
-     
-     Argument sets serial port
-        Android Uno:  /dev/ttyACM0
-        Android Nano: /dev/ttyUSB0
-  -->
-  <node
-    pkg="rosserial_python"
-    type="serial_node.py"
-    name="arduino_serial"
-    args="/dev/ttyUSB0"
-    ns="ghost_controller">
-      <param name="baud" value="115200"/>
-  </node>
+  <group ns="arduino_controller">
+    <!-- Node for converter CarControl messages to ServoControl messages -->
+    <node
+      pkg="ghost"
+      type="car_to_servo_converter"
+      name="car_to_servo_converter_node"
+    />
+    
+    <!-- rosserial node 
+       
+       Argument sets serial port
+          Android Uno:  /dev/ttyACM0
+          Android Nano: /dev/ttyUSB0
+    -->
+    <node
+      pkg="rosserial_python"
+      type="serial_node.py"
+      name="arduino_serial"
+      args="/dev/ttyUSB0">
+        <param name="baud" value="115200"/>
+    </node>
+  </group>
 
   <!-- Load URDF file -->
   <include file="$(find ghost)/launch/includes/state_publisher.launch.xml" />

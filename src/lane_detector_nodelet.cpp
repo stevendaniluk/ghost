@@ -30,10 +30,6 @@
 *     -Edges detected in the subscribed image_rect_mono
 *
 * Parameters
-*   ~cam_height (double, default: 0.1)
-*     -Height of camera from ground plan [m]
-*   ~cam_angle (double, default: 0.0)
-*     -Angle of camera about the X axis [Deg]
 *   ~min_range (double, defualt: 0.5)
 *     -Minimum detactable range for scanner [m]
 *   ~max_range (double, defualt: 5.0)
@@ -66,6 +62,8 @@
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/LaserScan.h>
+#include <tf/transform_listener.h>
+#include <tf/transform_datatypes.h>
 
 #define PI 3.14159265
 
@@ -77,11 +75,12 @@ class LaneDetector : public nodelet::Nodelet {
   boost::shared_ptr<image_transport::ImageTransport> it_;
   boost::shared_ptr<image_transport::ImageTransport> private_it_;
 
-  // Pubs and Subs
+  // Pubs, Subs, and tf
   image_transport::CameraSubscriber sub_camera_;   // To camera
   ros::Publisher pub_scan_;                        // Laserscan message
   image_transport::Publisher pub_bev_;             // Bird's eye view image
   image_transport::Publisher pub_edges_;           // Image with edges
+  tf::TransformListener tf_listener_;              // Listener for camera transform
 
   // BEV image properties
   double Z_bottom_pixel_;   // Real world depth at the bottom pixel row
@@ -99,7 +98,8 @@ class LaneDetector : public nodelet::Nodelet {
 
   bool initialized_;  // Flag for if the BEV transform and scanner have been calculated
 
-  // Camera parameters (loaded from parameter server)
+  // Camera height and pitch (from tf data)
+  tf::StampedTransform cam_tf_;  // Most recent transform between camera and base_footprint
   double cam_Y_;                 // Height of camera from ground
   double cam_angle_;             // Angle of camera (about the x axis)
 
@@ -141,8 +141,6 @@ class LaneDetector : public nodelet::Nodelet {
     pub_edges_  = private_it_->advertise("edges_image",  1, image_connect_cb, image_connect_cb);
 
     // Load configuration parameters from the parameter server
-    pnh.param<double>("cam_height", cam_Y_, 0.10);
-    pnh.param<double>("cam_angle", cam_angle_, 0.0);
     pnh.param<double>("min_range", min_range_, 0.5);
     pnh.param<double>("max_range", max_range_, 5.0);
     pnh.param<double>("angle_increment_", scan_angle_increment_, 1.0);
@@ -196,12 +194,26 @@ class LaneDetector : public nodelet::Nodelet {
   void imageCb(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info_msg){
     // Make sure the BEV transform and image scan points are initialized
     if (!initialized_){
+      // Need tf data to get camera height and angle
+      // (transform assumed to be constant)
+      try{
+        tf_listener_.waitForTransform("/base_footprint", "/" + scan_frame_id_, image_msg->header.stamp, ros::Duration(5.0));
+        tf_listener_.lookupTransform("/base_footprint", "/" + scan_frame_id_, ros::Time(0), cam_tf_);
+        cam_Y_ = cam_tf_.getOrigin().z();
+        tf::Quaternion cam_quat = cam_tf_.getRotation();
+        double roll_throwaway, yaw_throwaway;
+        tf::Matrix3x3(cam_quat).getRPY(roll_throwaway, cam_angle_, yaw_throwaway);
+      }catch (tf::TransformException &ex) {
+        NODELET_WARN("Waiting for tf data between /base_footprint and /%s.", scan_frame_id_.c_str());
+        return;
+      }
+      
       NODELET_INFO("Initializing detector.");
       initializeTransform(info_msg);
       initializeScanner();
       initialized_ = true;
     }
-
+    
     // Crop the input (apply ROI to the source image, to avoiding copy the unused area)
     const cv::Mat source = cv_bridge::toCvShare(image_msg, sensor_msgs::image_encodings::MONO8)->image;
     cv::Rect crop_ROI(0, image_msg->height - cropped_h_, image_msg->width, cropped_h_);
