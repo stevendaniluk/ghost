@@ -27,7 +27,7 @@ Notes about override servo signals:
 #endif
 
 #include <ros.h>
-#include <ros/time.h>
+#include <std_msgs/Float32.h>
 #include <ghost/ArduinoControl.h>
 #include <Servo.h> 
 
@@ -98,6 +98,8 @@ ros::Subscriber<ghost::ArduinoControl> cmd_in_sub("cmd_arduino", cmdInCallback);
 // Setup Publishers
 ghost::ArduinoControl cmd_out_msg;
 ros::Publisher cmd_out_pub("cmd_arduino_executed", &cmd_out_msg);
+std_msgs::Float32 rpm_msg;
+ros::Publisher rpm_pub("/motor_rpm", &rpm_msg);
 
 void setup(){
   nh.getHardware()->setBaud(115200);
@@ -105,6 +107,7 @@ void setup(){
     
   nh.subscribe(cmd_in_sub);
   nh.advertise(cmd_out_pub);
+  nh.advertise(rpm_pub);
   
   // Wait for connection
   while(!nh.connected()) {nh.spinOnce();}
@@ -194,16 +197,16 @@ void loop() {
     uint8_t oldest_index = (rpm_index + 1)%rpm_avg_n;
     float new_reading = rpm_readings[rpm_index];
     float oldest_reading = rpm_readings[oldest_index];
-    cmd_out_msg.motor_rpm = cmd_out_msg.motor_rpm + new_reading/rpm_avg_n - oldest_reading/rpm_avg_n;
+    rpm_msg.data = rpm_msg.data + new_reading/rpm_avg_n - oldest_reading/rpm_avg_n;
     
     // Update the readings index
     rpm_index++;
     if(rpm_index == rpm_avg_n)
       rpm_index = 0;
     
-    // Publish the message
-    cmd_out_msg.header.stamp = nh.now();
+    // Publish the messages
     cmd_out_pub.publish(&cmd_out_msg);
+    rpm_pub.publish(&rpm_msg);
   }
   
 }// end main

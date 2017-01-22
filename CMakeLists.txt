@@ -63,10 +63,10 @@ add_executable(teleop_ps3 src/teleop_ps3.cpp)
 add_dependencies(teleop_ps3 ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(teleop_ps3 ${catkin_LIBRARIES})
 
-# Car-to-Servo Converter executable
-add_executable(car_to_servo_converter src/car_to_servo_converter.cpp)
-add_dependencies(car_to_servo_converter ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(car_to_servo_converter ${catkin_LIBRARIES})
+# Car command converter executable
+add_executable(car_command_converter src/car_command_converter.cpp)
+add_dependencies(car_command_converter ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(car_command_converter ${catkin_LIBRARIES})
 
 # Executable for saving camera images
 add_executable(camera_frame_grabber src/camera_frame_grabber.cpp)

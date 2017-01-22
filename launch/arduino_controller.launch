@@ -12,8 +12,8 @@
     <!-- Node for converter CarControl messages to ServoControl messages -->
     <node
       pkg="ghost"
-      type="car_to_servo_converter"
-      name="car_to_servo_converter_node"
+      type="car_command_converter"
+      name="car_command_converter_node"
     />
     
     <!-- rosserial node 
