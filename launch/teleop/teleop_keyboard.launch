@@ -8,7 +8,6 @@
     type="teleop_keyboard"
     name="teleop_keyboard_node"
     output="screen"
-    ns="ghost_controller"
   />
   
 </launch>

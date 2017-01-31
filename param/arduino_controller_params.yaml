@@ -1,11 +1,11 @@
 # Parameter settings for Ghost arduino controller
 
-arduino_controller:
+arduino:
 
 # Servo Parameters
-  steering_centre_pwm: 100
-  steering_max_pwm: 140
-  steering_min_pwm: 60
-  throttle_centre_pwm: 87
-  throttle_max_pwm: 135
-  throttle_min_pwm: 53
+  str_centre: 100
+  str_max: 140
+  str_min: 60
+  thr_centre: 87
+  thr_max: 135
+  thr_min: 53

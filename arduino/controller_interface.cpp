@@ -70,10 +70,10 @@ unsigned long prev_pub_time = 0;
 // Servo parameters
 Servo steering;
 Servo throttle;
-int16_t steering_max_pwm;
-int16_t steering_min_pwm;
-int16_t throttle_max_pwm;
-int16_t throttle_min_pwm;
+int16_t steering_max;
+int16_t steering_min;
+int16_t throttle_max;
+int16_t throttle_min;
 
 // Output values for the servos from the controller and override
 uint16_t steering_ctrl;
@@ -99,7 +99,7 @@ ros::Subscriber<ghost::ArduinoControl> cmd_in_sub("cmd_arduino", cmdInCallback);
 ghost::ArduinoControl cmd_out_msg;
 ros::Publisher cmd_out_pub("cmd_arduino_executed", &cmd_out_msg);
 std_msgs::Float32 rpm_msg;
-ros::Publisher rpm_pub("/motor_rpm", &rpm_msg);
+ros::Publisher rpm_pub("motor_rpm", &rpm_msg);
 
 void setup(){
   nh.getHardware()->setBaud(115200);
@@ -113,40 +113,40 @@ void setup(){
   while(!nh.connected()) {nh.spinOnce();}
 
   // Get servo positions from parameter server
-  int16_t steering_centre_pwm;
-  int16_t throttle_centre_pwm;
+  int16_t steering_centre;
+  int16_t throttle_centre;
 
-  if (!nh.getParam("steering_centre_pwm", &steering_centre_pwm)) {
-    steering_centre_pwm = 100;
+  if (!nh.getParam("arduino/str_centre", &steering_centre)) {
+    steering_centre = 100;
   }
-  if (!nh.getParam("steering_max_pwm", &steering_max_pwm)) {
-    steering_max_pwm = 140;
+  if (!nh.getParam("arduino/str_max", &steering_max)) {
+    steering_max = 140;
   }
-  if (!nh.getParam("steering_min_pwm", &steering_min_pwm)) {
-    steering_min_pwm = 60;
+  if (!nh.getParam("arduino/str_min", &steering_min)) {
+    steering_min = 60;
   }
-  if (!nh.getParam("throttle_centre_pwm", &throttle_centre_pwm)) {
-    throttle_centre_pwm = 87;
+  if (!nh.getParam("arduino/thr_centre", &throttle_centre)) {
+    throttle_centre = 87;
   }
-  if (!nh.getParam("throttle_max_pwm", &throttle_max_pwm)) {
-    throttle_max_pwm = 135;
+  if (!nh.getParam("arduino/thr_max", &throttle_max)) {
+    throttle_max = 135;
   }
-  if (!nh.getParam("throttle_min_pwm", &throttle_min_pwm)) {
-    throttle_min_pwm = 53;
+  if (!nh.getParam("arduino/thr_min", &throttle_min)) {
+    throttle_min = 53;
   }
 
   // Initialize variables for controls (so the first message isn't zero)
-  steering_ctrl = steering_centre_pwm;
-  throttle_ctrl = throttle_centre_pwm;
-  steering_override = steering_centre_pwm;
-  throttle_override = throttle_centre_pwm;
+  steering_ctrl = steering_centre;
+  throttle_ctrl = throttle_centre;
+  steering_override = steering_centre;
+  throttle_override = throttle_centre;
   
   // Setup the servos
   steering.attach(STEERING_OUT_PIN);
   throttle.attach(THROTTLE_OUT_PIN);
   delay(10);
-  steering.write(steering_centre_pwm);
-  throttle.write(throttle_centre_pwm);
+  steering.write(steering_centre);
+  throttle.write(throttle_centre);
   
   // Attach interrupt to read override and rpm signals
   PCintPort::attachInterrupt(OVERRIDE_PIN, getOverride, CHANGE);
@@ -253,8 +253,8 @@ void getSteering() {
     // It is a falling edge, so subtract the time of the rising edge to get the pulse duration
     steering_override = (uint16_t)(micros() - steering_start);
     // Map to proper range, and make sure it is within bounds
-    steering_override = map(steering_override, 1050, 2000, steering_min_pwm, steering_max_pwm);
-    steering_override = constrain(steering_override, steering_min_pwm, steering_max_pwm);
+    steering_override = map(steering_override, 1050, 2000, steering_min, steering_max);
+    steering_override = constrain(steering_override, steering_min, steering_max);
   }
 }
 
@@ -267,8 +267,8 @@ void getThrottle() {
     // It is a falling edge, so subtract the time of the rising edge to get the pulse duration 
     throttle_override = (uint16_t)(micros() - throttle_start);
     // Map to proper range, and make sure it is within bounds
-    throttle_override = map(throttle_override, 1050, 2000, throttle_min_pwm, throttle_max_pwm);
-    throttle_override = constrain(throttle_override, throttle_min_pwm, throttle_max_pwm);
+    throttle_override = map(throttle_override, 1050, 2000, throttle_min, throttle_max);
+    throttle_override = constrain(throttle_override, throttle_min, throttle_max);
   }
 }
 

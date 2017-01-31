@@ -42,12 +42,12 @@ class Converter {
 
 Converter::Converter() {
   // Get relevant parameters
-  nh_.param("steering_centre_pwm", steering_centre_pwm_, 127);
-  nh_.param("steering_max_pwm", steering_max_pwm_, 255);
-  nh_.param("steering_min_pwm", steering_min_pwm_, 0);
-  nh_.param("throttle_centre_pwm", throttle_centre_pwm_, 127);
-  nh_.param("throttle_max_pwm", throttle_max_pwm_, 255);
-  nh_.param("throttle_min_pwm", throttle_min_pwm_, 0);
+  nh_.param("arduino/str_centre", steering_centre_pwm_, 127);
+  nh_.param("arduino/str_max", steering_max_pwm_, 255);
+  nh_.param("arduino/str_min", steering_min_pwm_, 0);
+  nh_.param("arduino/thr_centre", throttle_centre_pwm_, 127);
+  nh_.param("arduino/thr_max", throttle_max_pwm_, 255);
+  nh_.param("arduino/thr_min", throttle_min_pwm_, 0);
   
   // Subscribe to cmd_car and cmd_arduino_executed messsages
   car_cmd_sub_ = nh_.subscribe("cmd_car", 1000, &Converter::cmdCarCallback, this);
