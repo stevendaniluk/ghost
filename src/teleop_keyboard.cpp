@@ -28,7 +28,7 @@ class Teleop {
     void keyLoop();
         
     // Message to be published
-    ghost::CarControl msg;
+    ghost::CarControl msg_;
 
   private:
   ros::NodeHandle nh_;
@@ -115,10 +115,10 @@ void Teleop::keyLoop() {
     unknown_key = false;
     switch(key) {
       case KEYCODE_L:
-        steering -= 0.1;
+        steering += 0.1;
         break;
       case KEYCODE_R:
-        steering += 0.1;
+        steering -= 0.1;
         break;
       case KEYCODE_U:
         throttle += 0.05;
@@ -147,15 +147,14 @@ void Teleop::keyLoop() {
       throttle = std::min(throttle, 1.0f);
       throttle = std::max(throttle, -1.0f);
       
-      msg.steering = steering;
-      msg.throttle = throttle;
+      msg_.steering = steering;
+      msg_.throttle = throttle;
     }// end unknown_key if
     
     // Publish at desired frequency
     if (ros::Time::now() > (prev_pub_time + ros::Duration(1/pub_rate))) {
       prev_pub_time = ros::Time::now();
-      msg.header.stamp = ros::Time::now();
-      car_control_pub_.publish(msg);
+      car_control_pub_.publish(msg_);
       ROS_DEBUG("Steering=%.2f, Throttle=%.2f", steering, throttle);
     }
     

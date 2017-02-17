@@ -1,0 +1,12 @@
+# Parameter settings for Ghost car
+
+chassis:
+  d: 0.060             # Measured wheel diameter [m]
+  Cd: 1.04158          # Wheel diameter calibration coefficient
+  b: 0.162             # Measured track with [m]
+  Cb: 0.87548          # Track width calibration coefficient
+  delta_max: 28.15     # Max average steering angle between L and R wheels [degrees]
+
+odometry:
+  pulses_per_rev: 24   # Number of encoder pulses for one revolution
+  update_rate: 30      # Max frequency to publish odometry messages [Hz]

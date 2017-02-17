@@ -1,0 +1,26 @@
+
+<launch>
+  
+  <!-- Load the controller parameters -->
+  <rosparam 
+      file="$(find ghost)/param/car_params.yaml"
+      command="load" 
+  />
+  
+  <node
+    pkg="ghost"
+    type="cmd_faker"
+    name="cmd_faker"
+  />
+  
+  <node
+    pkg="ghost"
+    type="odometry_integration"
+    name="odometry_integration"
+    output="screen"
+  />
+  
+  <!-- Load URDF file -->
+  <include file="$(find ghost)/launch/includes/state_publisher.launch.xml" />
+  
+</launch>

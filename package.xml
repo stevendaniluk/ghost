@@ -20,6 +20,7 @@
   <build_depend>cv_bridge</build_depend>
   <build_depend>image_transport</build_depend>
   <build_depend>message_generation</build_depend>
+  <build_depend>nav_msgs</build_depend>
   <build_depend>nodelet</build_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>rosserial_arduino</build_depend>
@@ -35,11 +36,16 @@
   <run_depend>imu_filter_madgwick</run_depend>
   <run_depend>message_generation</run_depend>
   <run_depend>message_runtime</run_depend>
+  <run_depend>nav_msgs</run_depend>
   <run_depend>nodelet</run_depend>
   <run_depend>phidgets_imu</run_depend>
+  <run_depend>python-matplotlib</run_depend>
   <run_depend>robot_state_publisher</run_depend>
   <run_depend>roscpp</run_depend>
+  <run_depend>rospy</run_depend>
   <run_depend>rosserial_arduino</run_depend>
+  <run_depend>rosserial_python</run_depend>
+  <run_depend>rosserial_server</run_depend>
   <run_depend>sensor_msgs</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>tf</run_depend>

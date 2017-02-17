@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
   message_generation
+  nav_msgs
   nodelet
   roscpp
   rosserial_arduino
@@ -19,7 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   CarControl.msg
-  ArduinoControl.msg
+  ArduinoState.msg
 )
 
 generate_messages(
@@ -50,8 +51,8 @@ rosserial_configure_client(
   DIRECTORY arduino
   TOOLCHAIN_FILE ${ROSSERIAL_ARDUINO_TOOLCHAIN}
 )
-rosserial_add_client_target(arduino controller_interface)
-rosserial_add_client_target(arduino controller_interface-upload)
+rosserial_add_client_target(arduino onboard_arduino)
+rosserial_add_client_target(arduino onboard_arduino-upload)
 
 # Keyboard teleop executable
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)
@@ -63,10 +64,10 @@ add_executable(teleop_ps3 src/teleop_ps3.cpp)
 add_dependencies(teleop_ps3 ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(teleop_ps3 ${catkin_LIBRARIES})
 
-# Car command converter executable
-add_executable(car_command_converter src/car_command_converter.cpp)
-add_dependencies(car_command_converter ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(car_command_converter ${catkin_LIBRARIES})
+# Odometry integration executable
+add_executable(odometry_integration src/odometry_integration.cpp)
+add_dependencies(odometry_integration ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(odometry_integration ${catkin_LIBRARIES})
 
 # Executable for saving camera images
 add_executable(camera_frame_grabber src/camera_frame_grabber.cpp)

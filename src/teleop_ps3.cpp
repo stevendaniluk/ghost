@@ -62,7 +62,7 @@ Teleop::Teleop() {
 
 // Read in the joystick data
 void Teleop::joyCallback(const sensor_msgs::Joy::ConstPtr& joy) {  
-  msg_.steering = -joy->axes[steering_axis_]; 
+  msg_.steering = joy->axes[steering_axis_]; 
   msg_.throttle = -joy->axes[gas_trigger_] - joy->axes[brake_trigger_];
 }
 
@@ -70,7 +70,6 @@ void Teleop::joyCallback(const sensor_msgs::Joy::ConstPtr& joy) {
 void Teleop::publish() {
   boost::mutex::scoped_lock lock(publish_mutex_);
   
-  msg_.header.stamp = ros::Time::now();
   if (msg_.steering == 0 && msg_.throttle == 0) {
     // Publish once zero message, then stop
     if (publish_once_) {

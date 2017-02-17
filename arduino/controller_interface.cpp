@@ -1,23 +1,26 @@
-/* Interface for controlling the car servos
+/* Interface for controlling the car
 
-Monitors the cmd_arduino topic for commands from the controller, as well as 
-monitoring inputs from the remote to handle override commands. The 
-cmd_arduino_executed topic is published, which contains the commands executed 
-on the servos.
+Monitors the cmd_car topic for commands from the controller, as well as 
+monitoring inputs from the transmitter. When override is active, the 
+transmitter commands are issued to the steering servo and ESC, and when
+override is inactive, the controller commands are issued.
+
+Wheel encoder signals are also monitored to count pulses.
+
+Commands are in the range [-1,1], with 1.0 being max left, and -1.0 being max right.
 
 Override is activated by pressing the third channel button on the remote. When active
-the servos will be controled by the remote, and the cmd_arduino_executed topic will
-contain the remote commands with the override flag set true.
+the servos will be controled by the remote, and the cmd_car_executed topic will
+contain the remote commands.
 
-Motor RPM is measured and has a moving average applied to it. The RPm is included
-in the cmd_arduino_executed topic.
+Wheel encoder signals are also monitored to count pulses.
 
-Notes about override servo signals:
-  -Range of signals is [1050, 2000]
-  -Servo signals get mapped between the min and max values loaded from the param server
-  -Channel three switches between 1050 (not active) and 2000 (active)
-
+The arduino_state topic is published, which contains the commands executed 
+on the servo and esc, an override flag, and the encoder pulses.
 */
+
+//--------------------------------------------------
+// INCLUDES
 //--------------------------------------------------
 
 #if defined(ARDUINO) && ARDUINO >= 100
@@ -27,268 +30,332 @@ Notes about override servo signals:
 #endif
 
 #include <ros.h>
-#include <std_msgs/Float32.h>
-#include <ghost/ArduinoControl.h>
+#include <ros/time.h>
+#include <std_msgs/UInt32.h>
+#include <ghost/CarControl.h>
+#include <ghost/ArduinoState.h>
 #include <Servo.h> 
 
 // Use PinChangeInt library to detect rising/falling/change on any pin
 // Declare which ports will not be used to save memory
-#define NO_PORTB_PINCHANGES
+//#define NO_PORTB_PINCHANGES
 #define NO_PORTC_PINCHANGES
 #include "PinChangeInt.h" // https://github.com/GreyGnome/PinChangeInt
 
-// Assign servo pins
+//--------------------------------------------------
+// PARAMETERS
+//--------------------------------------------------
+
+// Assign pins
 #define STEERING_IN_PIN 2
 #define THROTTLE_IN_PIN 3
 #define OVERRIDE_PIN 4
-#define RPM_PIN 5
-#define STEERING_OUT_PIN 9
-#define THROTTLE_OUT_PIN 10
+#define STEERING_OUT_PIN 5
+#define THROTTLE_OUT_PIN 6
+#define FL_ENCODER_PIN 7
+#define FR_ENCODER_PIN 8
+#define RL_ENCODER_PIN 9
+#define RR_ENCODER_PIN 10
 
-// Variables for interrupts monitoring
-volatile uint16_t override_in_shared;     // Override signal
-uint32_t steering_start;                  // Rising edge of steering servo pulse
-uint32_t throttle_start;                  // Rising edge of throttle servo pulse
-uint32_t override_start;                  // Rising edge of override servo pulse
-bool override_flag = false;               // When the override signal changes
+// Set PWM and servo parameters
+const uint8_t steering_max = 140;           // Max steering value for arduino lirary [0,255]
+const uint8_t steering_min = 60;            // Min steering value for arduino lirary [0,255]
+const uint8_t steering_centre = 100;        // Centre steering value for arduino lirary [0,255]
+const uint8_t throttle_max = 135;           // Max throttle value for arduino lirary [0,255]
+const uint8_t throttle_min = 53;            // Min throttle value for arduino lirary [0,255]
+const uint8_t throttle_centre = 87;         // Centre throttle value for arduino lirary [0,255]
+const uint16_t max_pwm = 2000;              // Max detectable PWM value (from both steering servo and ESC)
+const uint16_t min_pwm = 1050;              // Min detectable PWM value (from both steering servo and ESC)
+const uint16_t override_pwm_thresh = 1500;  // Threshold PWM value for 3rd channel switch
+
+// Pub/Sub settings
+const int16_t pub_rate = 50;      // Rate to publish executed commands and encoder pulses
+const int16_t cmd_timout = 500;   // Maximum time to wait for cmd_car message before zeroing commands
+
+//--------------------------------------------------
+// VARIABLE DECLERATION
+//--------------------------------------------------
+
+// Inbound and outbound message timing variables
+const uint16_t delta_pub_millis = round(1000/pub_rate);  // Time between publishing
+unsigned long prev_pub_time = 0;                         // Time of last published message
+unsigned long cmd_receive_time = 0;                      // Time of last command received
+
+// Create arduino servo objects
+Servo steering;
+Servo throttle;
+
+// Output values for the servo and ESC from the controller and override
+float steering_cmd;         // From the controller [-1,1]
+float throttle_cmd;         // From the controller [-1,1]
+float steering_override;    // From override [-1,1]
+float throttle_override;    // From override [-1,1]
+
+// Throttle and steering interrupt monitoring variables
+uint16_t steering_override_pwm_local;            // Local copy of steering signal
+uint16_t throttle_override_pwm_local;            // Local copy of throttle signal
+volatile uint16_t steering_override_pwm_shared;  // Steering signal
+volatile uint16_t throttle_override_pwm_shared;  // Throttle signal
+volatile uint16_t override_pwm_shared;           // Override signal
+volatile bool steering_flag_shared = false;      // When the steering signal changes
+volatile bool throttle_flag_shared = false;      // When the throttle signal changes
+volatile bool override_flag_shared = false;      // When the override signal changes
+uint32_t steering_start;                         // Rising edge of steering servo pulse (only used in ISR)
+uint32_t throttle_start;                         // Rising edge of throttle servo pulse (only used in ISR)
+uint32_t override_start;                         // Rising edge of override servo pulse (only used in ISR)
 
 // Flags for checking if override has changed
 bool override_active = false;
 bool prev_override_active = false;
 
-// RPM monitoring variables
-volatile uint16_t rpm_pulses_shared = 0;  // Counter for pulses between average updates
-const uint8_t rpm_avg_n = 10;             // Number of points to use in moving average
-float rpm_readings[rpm_avg_n] = {0};      // Array or rpm readings
-uint8_t rpm_index = 0;                    // Index of the current rpm reading
+// Determine centre throttle PWM value based on servo library values (it is not 50/50 throttle and brake)
+const float throttle_frac = float(throttle_max - throttle_centre)/float(throttle_max - throttle_min);
+const uint16_t throttle_centre_pwm = min_pwm + (max_pwm - min_pwm)*(1 - throttle_frac);
 
-// Varaibles for publishing at the desired rate
-const uint8_t pub_freq = 50;
-const uint16_t delta_pub_millis = uint16_t round(1000/pub_freq);
-unsigned long prev_pub_time = 0;
-
-// Servo parameters
-Servo steering;
-Servo throttle;
-int16_t steering_max;
-int16_t steering_min;
-int16_t throttle_max;
-int16_t throttle_min;
-
-// Output values for the servos from the controller and override
-uint16_t steering_ctrl;
-uint16_t throttle_ctrl;
-volatile uint16_t steering_override;
-volatile uint16_t throttle_override;
+// Encoder variables
+volatile uint32_t FL_encoder_pulses_shared = 0;
+volatile uint32_t FR_encoder_pulses_shared = 0;
+volatile uint32_t RL_encoder_pulses_shared = 0;
+volatile uint32_t RR_encoder_pulses_shared = 0;
 
 //--------------------------------------------------
-void cmdInCallback(const ghost::ArduinoControl& msg);
+// FUNCTION DECLARATION
+//--------------------------------------------------
+
+void cmdInCallback(const ghost::CarControl& msg);
 void checkOverride();
-void getSteering();
-void getThrottle();
-void getOverride();
-void getRPM();
+void steeringISR();
+void throttleISR();
+void overrideISR();
+void FLEncoderISR();
+void FREncoderISR();
+void RLEncoderISR();
+void RREncoderISR();
+
+//--------------------------------------------------
+// SETUP
 //--------------------------------------------------
 
-ros::NodeHandle nh;
+ros::NodeHandle_<ArduinoHardware, 1, 2, 150, 400> nh;
 
 // Setup subscribers
-ros::Subscriber<ghost::ArduinoControl> cmd_in_sub("cmd_arduino", cmdInCallback);
+ros::Subscriber<ghost::CarControl> cmd_sub("cmd_car", cmdInCallback);
 
 // Setup Publishers
-ghost::ArduinoControl cmd_out_msg;
-ros::Publisher cmd_out_pub("cmd_arduino_executed", &cmd_out_msg);
-std_msgs::Float32 rpm_msg;
-ros::Publisher rpm_pub("motor_rpm", &rpm_msg);
+ghost::ArduinoState state_msg;
+ros::Publisher state_pub("arduino_state", &state_msg);
 
 void setup(){
   nh.getHardware()->setBaud(115200);
   nh.initNode();
     
-  nh.subscribe(cmd_in_sub);
-  nh.advertise(cmd_out_pub);
-  nh.advertise(rpm_pub);
+  nh.subscribe(cmd_sub);
+  nh.advertise(state_pub);
   
   // Wait for connection
   while(!nh.connected()) {nh.spinOnce();}
 
-  // Get servo positions from parameter server
-  int16_t steering_centre;
-  int16_t throttle_centre;
-
-  if (!nh.getParam("arduino/str_centre", &steering_centre)) {
-    steering_centre = 100;
-  }
-  if (!nh.getParam("arduino/str_max", &steering_max)) {
-    steering_max = 140;
-  }
-  if (!nh.getParam("arduino/str_min", &steering_min)) {
-    steering_min = 60;
-  }
-  if (!nh.getParam("arduino/thr_centre", &throttle_centre)) {
-    throttle_centre = 87;
-  }
-  if (!nh.getParam("arduino/thr_max", &throttle_max)) {
-    throttle_max = 135;
-  }
-  if (!nh.getParam("arduino/thr_min", &throttle_min)) {
-    throttle_min = 53;
-  }
-
   // Initialize variables for controls (so the first message isn't zero)
-  steering_ctrl = steering_centre;
-  throttle_ctrl = throttle_centre;
-  steering_override = steering_centre;
-  throttle_override = throttle_centre;
+  steering_cmd = steering_centre;
+  throttle_cmd = throttle_centre;
+  steering_override_pwm_shared = steering_cmd;
+  throttle_override_pwm_shared = throttle_cmd;
   
   // Setup the servos
   steering.attach(STEERING_OUT_PIN);
   throttle.attach(THROTTLE_OUT_PIN);
   delay(10);
-  steering.write(steering_centre);
-  throttle.write(throttle_centre);
+  steering.write(steering_cmd);
+  throttle.write(throttle_cmd);
   
-  // Attach interrupt to read override and rpm signals
-  PCintPort::attachInterrupt(OVERRIDE_PIN, getOverride, CHANGE);
-  PCintPort::attachInterrupt(RPM_PIN, getRPM, CHANGE);
-
+  // Attach interrupt to read override and encoder signals
+  PCintPort::attachInterrupt(OVERRIDE_PIN, overrideISR, CHANGE);
+  PCintPort::attachInterrupt(FL_ENCODER_PIN, FLEncoderISR, CHANGE);
+  PCintPort::attachInterrupt(FR_ENCODER_PIN, FREncoderISR, CHANGE);
+  PCintPort::attachInterrupt(RL_ENCODER_PIN, RLEncoderISR, CHANGE);
+  PCintPort::attachInterrupt(RR_ENCODER_PIN, RREncoderISR, CHANGE);
+  
+  delay(1000);
 }// end setup
 
 //--------------------------------------------------
+// MAIN
+//--------------------------------------------------
 
 void loop() {
-  
   // Get controller commands from callback
   nh.spinOnce();
 
   // Check if controller commands are being overidden
   checkOverride();
-
+  
   // Fill the message with the controller or the override commands
-  if(override_active) {
-    // Use the override commands
-    cmd_out_msg.steering = steering_override;
-    cmd_out_msg.throttle = throttle_override;
-    cmd_out_msg.override = true;    
+  if(override_active) {    
+    // Make a local copy of inputs
+    noInterrupts();
+    if(steering_flag_shared) {
+      steering_override_pwm_local = steering_override_pwm_shared;
+      steering_flag_shared = false;
+    }
+    if(throttle_flag_shared) {
+      throttle_override_pwm_local = throttle_override_pwm_shared;
+      throttle_flag_shared = false;
+    }
+    interrupts();
+    
+    // Map to range [-1,1], and make sure they are within bounds
+    steering_override = -2.0*float(steering_override_pwm_local - min_pwm)/float(max_pwm - min_pwm) + 1.0;
+    steering_override = min(max(steering_override,-1.0), 1.0);
+    
+    if(throttle_override_pwm_local >= throttle_centre_pwm){
+      throttle_override = float(throttle_override_pwm_local - throttle_centre_pwm)/float(max_pwm - throttle_centre_pwm);
+    }else{
+      throttle_override = -float(throttle_centre_pwm - throttle_override_pwm_local)/float(throttle_centre_pwm - min_pwm);
+    }
+    throttle_override = min(max(throttle_override,-1.0), 1.0);
+    
+    state_msg.steering = steering_override;
+    state_msg.throttle = throttle_override;
   }else {
-    // Use the controller commands
-    cmd_out_msg.steering = steering_ctrl;
-    cmd_out_msg.throttle = throttle_ctrl;
-    cmd_out_msg.override = false;
+    // Check controller timeout
+    if((millis() - cmd_receive_time) > cmd_timout) {
+      steering_cmd = 0.0;
+      throttle_cmd = 0.0;
+    }
+    state_msg.steering = steering_cmd;
+    state_msg.throttle = throttle_cmd;
   }
   
-  // Write the commands to the servos
-  steering.write(cmd_out_msg.steering); 
-  throttle.write(cmd_out_msg.throttle);
+  // Write the commands to the servos (must convert to [0,255] range)
+  uint16_t steering_cmd_write, throttle_cmd_write;
+  if(state_msg.steering > 0.0){
+    steering_cmd_write = steering_centre - state_msg.steering*(steering_centre - steering_min);
+  }else{
+    steering_cmd_write = steering_centre - state_msg.steering*(steering_max - steering_centre);
+  }  
+  if(state_msg.throttle > 0.0){
+    throttle_cmd_write = throttle_centre + state_msg.throttle*(throttle_max - throttle_centre);
+  }else{
+    throttle_cmd_write = throttle_centre + state_msg.throttle*(throttle_centre - throttle_min);
+  }  
+  steering.write(steering_cmd_write);
+  throttle.write(throttle_cmd_write);
 
   // Publish messages at the desired rate
-  unsigned long pub_time = millis();
+  const unsigned long pub_time = millis();
   if ((pub_time - prev_pub_time) > delta_pub_millis) {
     prev_pub_time = pub_time;
-
-    // Determine motor RPM from the pulses since the last message
-    // and add it to the array of readings
-    // (must divide by two, since each interrupt is 1/2 of a rotation)
-    unsigned long rpm_pulses = rpm_pulses_shared;
-    rpm_pulses_shared = 0;
-    rpm_readings[rpm_index] = (0.5f*float(rpm_pulses)*60.0f)/(float(pub_freq)/1000.0f);
-
-    // Compute the RPM moving average
-    uint8_t oldest_index = (rpm_index + 1)%rpm_avg_n;
-    float new_reading = rpm_readings[rpm_index];
-    float oldest_reading = rpm_readings[oldest_index];
-    rpm_msg.data = rpm_msg.data + new_reading/rpm_avg_n - oldest_reading/rpm_avg_n;
-    
-    // Update the readings index
-    rpm_index++;
-    if(rpm_index == rpm_avg_n)
-      rpm_index = 0;
-    
+        
+    // Get encoder counts
+    noInterrupts();
+    state_msg.FL_pulse_count = FL_encoder_pulses_shared;
+    state_msg.FR_pulse_count = FR_encoder_pulses_shared;
+    state_msg.RL_pulse_count = RL_encoder_pulses_shared;
+    state_msg.RR_pulse_count = RR_encoder_pulses_shared;
+    interrupts();
+        
     // Publish the messages
-    cmd_out_pub.publish(&cmd_out_msg);
-    rpm_pub.publish(&rpm_msg);
+    state_msg.override = override_active;
+    state_msg.header.stamp = nh.now();
+    state_pub.publish(&state_msg);
   }
   
-}// end main
+}// end loop
 
+//--------------------------------------------------
+// FUNCTIONS
 //--------------------------------------------------
 
 // Steering command callback for messages from the controller
-void cmdInCallback(const ghost::ArduinoControl& msg) {
-  steering_ctrl = msg.steering;
-  throttle_ctrl = msg.throttle;
+void cmdInCallback(const ghost::CarControl& msg) {
+  steering_cmd = msg.steering;
+  throttle_cmd = msg.throttle;
+  cmd_receive_time = millis();
 }
 
 // Check input servo pin for override activity
 void checkOverride() {
   // Check the override value
-  if(override_flag) {
-    if(override_in_shared < 1500) {
-      override_active = false;
-    }else {
-      override_active = true;
-    }
+  noInterrupts();
+  if(override_flag_shared) {
+    override_active = (override_pwm_shared >= override_pwm_thresh);
+    override_flag_shared = false;
   }
+  interrupts();
   
   // Attach/dettach the steering and throttle interrupts 
   // (don't need them running when override not in use)
   if (override_active) {
     // This is the start of an override, attach interrupts
-    PCintPort::attachInterrupt(STEERING_IN_PIN, getSteering, CHANGE); 
-    PCintPort::attachInterrupt(THROTTLE_IN_PIN, getThrottle, CHANGE);
+    PCintPort::attachInterrupt(STEERING_IN_PIN, steeringISR, CHANGE); 
+    PCintPort::attachInterrupt(THROTTLE_IN_PIN, throttleISR, CHANGE);
   }else if (!override_active && prev_override_active) {
     // This is the end of an override, dettachinterrupts
     PCintPort::detachInterrupt(STEERING_IN_PIN);
     PCintPort::detachInterrupt(THROTTLE_IN_PIN);
   }
   prev_override_active = override_active;
-}// end checkOverride
+}
 
 // Steering interrupt service routine
-void getSteering() {
+void steeringISR() {
   if(digitalRead(STEERING_IN_PIN) == HIGH) { 
     // It's a rising edge of the signal pulse, so record its value
     steering_start = micros();
   } else {
     // It is a falling edge, so subtract the time of the rising edge to get the pulse duration
-    steering_override = (uint16_t)(micros() - steering_start);
-    // Map to proper range, and make sure it is within bounds
-    steering_override = map(steering_override, 1050, 2000, steering_min, steering_max);
-    steering_override = constrain(steering_override, steering_min, steering_max);
+    steering_override_pwm_shared = (uint16_t)(micros() - steering_start);
+    // Set the steering flag to indicate that a new steering signal has been received
+    steering_flag_shared = true;
   }
 }
 
 // Throttle interrupt service routine
-void getThrottle() {
+void throttleISR() {
   if(digitalRead(THROTTLE_IN_PIN) == HIGH) { 
     // It's a rising edge of the signal pulse, so record its value
     throttle_start = micros();
   } else {
     // It is a falling edge, so subtract the time of the rising edge to get the pulse duration 
-    throttle_override = (uint16_t)(micros() - throttle_start);
-    // Map to proper range, and make sure it is within bounds
-    throttle_override = map(throttle_override, 1050, 2000, throttle_min, throttle_max);
-    throttle_override = constrain(throttle_override, throttle_min, throttle_max);
+    throttle_override_pwm_shared = (uint16_t)(micros() - throttle_start);
+    // Set the throttle flag to indicate that a new throttle signal has been received
+    throttle_flag_shared = true;
   }
 }
 
 // Override interrupt service routine
-void getOverride() {
+void overrideISR() {
   if(digitalRead(OVERRIDE_PIN) == HIGH) { 
     // It's a rising edge of the signal pulse, so record its value
     override_start = micros();
-    override_flag = false;
   } else {
     // It is a falling edge, so subtract the time of the rising edge to get the pulse duration
-    override_in_shared = (uint16_t)(micros() - override_start);
+    override_pwm_shared = (uint16_t)(micros() - override_start);
     // Set the override flag to indicate that a new override signal has been received
-    override_flag = true;
+    override_flag_shared = true;
   }
 }
 
-// RPM interrupt service routine
-void getRPM() {
+// Encoder interrupt service routine
+void FLEncoderISR() {
   // Simply need to count the pulses
-  // Signal changes from high to low every 1/2 turn
-  rpm_pulses_shared++;
+  FL_encoder_pulses_shared++;
+}
+
+// Encoder interrupt service routine
+void FREncoderISR() {
+  // Simply need to count the pulses
+  FR_encoder_pulses_shared++;
+}
+
+// Encoder interrupt service routine
+void RLEncoderISR() {
+  // Simply need to count the pulses
+  RL_encoder_pulses_shared++;
+}
+
+// Encoder interrupt service routine
+void RREncoderISR() {
+  // Simply need to count the pulses
+  RR_encoder_pulses_shared++;
 }

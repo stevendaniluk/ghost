@@ -1,0 +1,55 @@
+<!-- Launcher for ghost car
+
+Includes:
+  -Car parameters
+  -URDF model
+  -Arduino
+  -Odometry integration
+-->
+
+<launch>
+  
+  <!-- Load the car parameters -->
+  <rosparam 
+      file="$(find ghost)/param/car_params.yaml"
+      command="load" 
+  />
+  
+  <!-- Load URDF file -->
+  <include file="$(find ghost)/launch/includes/state_publisher.launch.xml" />
+  
+  <!-- Start rosserial
+     
+    Board specific serial ports:
+        Android Uno:  /dev/ttyACM0
+        Android Nano: /dev/ttyUSB0
+    Possible baud rates:
+        9600, 14400, 19200, 28800, 38400, 57600, or 115200
+  -->
+  <node 
+    pkg="rosserial_server" 
+    type="serial_node" 
+    name="rosserial_server" >
+    <rosparam>
+      port: /dev/ttyUSB0
+      baud: 115200
+      require:
+        publishers: [arduino_state]
+        subscribers: []
+    </rosparam>
+  </node>
+  <node
+    pkg="rosserial_python"
+    type="message_info_service.py"
+    name="rosserial_message_info"
+  />
+  
+  <!-- Node for estimating odometry by integrating velocity -->
+  <node
+    pkg="ghost"
+    type="odometry_integration"
+    name="odometry_integration"
+    output="screen"
+  />
+  
+</launch>
