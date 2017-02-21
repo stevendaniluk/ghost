@@ -2,11 +2,16 @@
 
 chassis:
   d: 0.060             # Measured wheel diameter [m]
-  Cd: 1.04158          # Wheel diameter calibration coefficient
+  Cd: 1.03159          # Wheel diameter calibration coefficient
   b: 0.162             # Measured track with [m]
-  Cb: 0.87548          # Track width calibration coefficient
-  delta_max: 28.15     # Max average steering angle between L and R wheels [degrees]
+  Cb: 0.91723          # Track width calibration coefficient
+  delta_max: 25.83     # Max average steering angle between L and R wheels [degrees]
 
 odometry:
   pulses_per_rev: 24   # Number of encoder pulses for one revolution
   update_rate: 30      # Max frequency to publish odometry messages [Hz]
+  pose_covariance_diagonal: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-3]
+  twist_covariance_diagonal: [1e-3, 1e-5, 1e-6, 1e-6, 1e-6, 1e-2]
+  base_frame: cog
+  world_frame: odom
+  publish_tf: false     # If the tf from base_frame to world_frame should be published

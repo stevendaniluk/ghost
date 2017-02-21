@@ -20,8 +20,7 @@
 </material>
 
 <!-- Main body -->
-<link name="base_footprint"/>
-<link name="base_link">
+<link name="base_footprint">
     <visual>
       <geometry>
         <box size="${wheelbase} ${track_width} ${car_height}"/>
@@ -30,20 +29,23 @@
       <material name="blue"/>
     </visual>
 </link>
-<joint name="base_joint" type="fixed">
-  <origin xyz="0 0 0" rpy="0 0 0" />
+
+<!-- Centre of Gravity -->
+<link name="cog"/>
+<joint name="cog_joint" type="fixed">
+  <origin xyz="${0.5*wheelbase} 0 ${0.5*car_height}" rpy="0 0 0" />
   <parent link="base_footprint"/>
-  <child link="base_link" />
+  <child link="cog" />
 </joint>
 
 <!-- IMU -->
-<!-- Origin is at the corner with the labeled axis, on the lower surface-->
+<!-- Origin is at the centre of board -->
 <xacro:property name="imu_length" value="0.02" />
 <xacro:property name="imu_width" value="0.03" />
 <xacro:property name="imu_height" value="0.004" />
-<xacro:property name="imu_x" value="0.025" />
-<xacro:property name="imu_y" value="-0.032" />
-<xacro:property name="imu_z" value="0.079" />
+<xacro:property name="imu_x" value="${wheelbase + 0.032}" />
+<xacro:property name="imu_y" value="0.0" />
+<xacro:property name="imu_z" value="0.038" />
 <xacro:property name="imu_yaw" value="0.0" />
 
 <link name="imu">
@@ -51,12 +53,12 @@
     <geometry>
       <box size="${imu_length} ${imu_width} ${imu_height}"/>
     </geometry>
-    <origin rpy="0 0 0" xyz="${0.5*imu_length} ${-0.5*imu_width} ${0.5*imu_height}"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
     <material name="black"/>
   </visual>
 </link>
 <joint name="imu_mount" type="fixed">
-  <parent link="base_link"/>
+  <parent link="base_footprint"/>
   <child link="imu"/>
   <origin rpy="0 0 ${imu_yaw}" xyz="${imu_x} ${imu_y} ${imu_z}"/>
 </joint>
@@ -80,7 +82,7 @@
   </visual>
 </link>
 <joint name="camera_mount" type="fixed">
-  <parent link="base_link"/>
+  <parent link="base_footprint"/>
   <child link="camera"/>
   <origin rpy="0 ${camera_pitch} 0" xyz="${camera_x} ${camera_y} ${camera_z}"/>
 </joint>
@@ -94,6 +96,5 @@
   <child link="scanner"/>
   <origin rpy="0 ${-camera_pitch} 0" xyz="0 0 ${-camera_z}"/>
 </joint>
-
 
 </robot>

@@ -1,0 +1,88 @@
+# Parameters for the robot_localization Extended Kalman Filter
+
+# General Settings
+frequency: 50                            # Rate to produce state estimates
+sensor_timeout: 0.1                      # Time beyond which predictions are made without correction
+two_d_mode: true                         # Fuse zero values for 3D variables
+dynamic_process_noise_covariance: true   # Scale the process noise with velocity
+use_control: false                       # Use control during prediction phase
+publish_acceleration: false              # Publish linear acceleration data
+
+# Published TF Settings
+publish_tf: true                   # Publish TF from world_frame to base_link_frame
+transform_time_offset: 0.0         # Value to future date transforms
+odom_frame: odom
+base_link_frame: base_footprint
+world_frame: odom
+
+# Diagnostics and debugging
+print_diagnostics: false
+debug: false
+debug_out_file: /path/to/debug/file.txt
+
+##### Odometry Configuration #####
+odom0: odometry/integrated
+odom0_config: [false, false, false,
+               false, false, false,
+               true,  true,  false,
+               false, false, true,
+               false, false, false]
+
+odom0_queue_size: 2
+odom0_nodelay: true
+odom0_differential: false
+odom0_relative: false
+#odom0_pose_rejection_threshold: 5
+#odom0_twist_rejection_threshold: 1
+
+##### IMU Configuration #####
+imu0: imu/data
+imu0_config: [false, false, false,
+              false, false, false,
+              false, false, false,
+              false, false, true,
+              true,  true, false]
+
+imu0_queue_size: 5
+imu0_nodelay: false
+imu0_differential: false
+imu0_relative: false
+imu0_remove_gravitational_acceleration: true
+#imu0_pose_rejection_threshold: 0.8
+#imu0_twist_rejection_threshold: 0.8
+#imu0_linear_acceleration_rejection_threshold: 0.8
+
+# Covariance Matrices
+#                          X     Y     Z     R     P     Y     Vx     Vy     Vz    Vr    Vp    Vy    ax    ay    az   
+process_noise_covariance: [0.05, 0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                           0,    0.05, 0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                           0,    0,    1e-6, 0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                           0,    0,    0,    1e-6, 0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                           0,    0,    0,    0,    1e-6, 0,    0,     0,     0,    0,    0,    0,    0,    0,    0,
+                           0,    0,    0,    0,    0,    1e-3, 0,     0,     0,    0,    0,    0,    0,    0,    0,
+                           0,    0,    0,    0,    0,    0,    0.025, 0,     0,    0,    0,    0,    0,    0,    0,
+                           0,    0,    0,    0,    0,    0,    0,     0.025, 0,    0,    0,    0,    0,    0,    0,
+                           0,    0,    0,    0,    0,    0,    0,     0,     1e-6, 0,    0,    0,    0,    0,    0,
+                           0,    0,    0,    0,    0,    0,    0,     0,     0,    1e-6, 0,    0,    0,    0,    0,
+                           0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    1e-6, 0,    0,    0,    0,
+                           0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0.02, 0,    0,    0,
+                           0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    1e-3, 0,    0,
+                           0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    1e-4, 0,
+                           0,    0,    0,    0,    0,    0,    0,     0,     0,    0,    0,    0,    0,    0,    1e-6]
+
+#                             X     Y     Z     R     P     Y     Vx     Vy     Vz    Vr    Vp    Vy    ax    ay    az   
+initial_estimate_covariance: [1e-6, 0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                              0,    1e-6, 0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                              0,    0,    1e-9, 0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                              0,    0,    0,    1e-9, 0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                              0,    0,    0,    0,    1e-9, 0,    0,    0,    0,    0,     0,     0,     0,    0,    0,
+                              0,    0,    0,    0,    0,    1e-6, 0,    0,    0,    0,     0,     0,     0,    0,    0,
+                              0,    0,    0,    0,    0,    0,    1e-6, 0,    0,    0,     0,     0,     0,    0,    0,
+                              0,    0,    0,    0,    0,    0,    0,    1e-9, 0,    0,     0,     0,     0,    0,    0,
+                              0,    0,    0,    0,    0,    0,    0,    0,    1e-9, 0,     0,     0,     0,    0,    0,
+                              0,    0,    0,    0,    0,    0,    0,    0,    0,    1e-9,  0,     0,     0,    0,    0,
+                              0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     1e-9,  0,     0,    0,    0,
+                              0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     1e-6,  0,    0,    0,
+                              0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     1e-6, 0,    0,
+                              0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    1e-9, 0,
+                              0,    0,    0,    0,    0,    0,    0,    0,    0,    0,     0,     0,     0,    0,    1e-9]

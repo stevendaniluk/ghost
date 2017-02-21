@@ -15,6 +15,7 @@
 #include <tf/transform_broadcaster.h>
 #include <nav_msgs/Odometry.h>
 #include <ghost/ArduinoState.h>
+#include <boost/assign.hpp>
 
 #define PI 3.141592653589793
 
@@ -38,6 +39,7 @@ class Odometry {
 		double Cb_;         // Track width calibration coefficient
 		double delta_max_;  // Max average steering angle between L and R wheels [radians]
 		int m_;             // Number of encoder pulses for one revolution
+		bool publish_tf_;
 		
 		// Data variables
 		double x_;                 // Pose X coordinate
@@ -65,14 +67,52 @@ Odometry::Odometry() {
 	// Get relevant parameters
 	int update_rate;
 	double delta_max_deg;
-	nh_.param("chassis/d", d_, 0.060);
-	nh_.param("chassis/Cd", Cd_, 1.0);
-	nh_.param("chassis/b", b_, 0.162);
-	nh_.param("chassis/Cb", Cb_, 1.0);
-	nh_.param("chassis/delta_max", delta_max_deg, 30.0);
-	nh_.param("odometry/pulses_per_rev", m_, 24);
-	nh_.param("odometry/update_rate", update_rate, 30);
-		
+	std::vector<double> pose_cov_diag(6, 1e-6);
+	std::vector<double> twist_cov_diag(6, 1e-6);
+	std::string base_frame, world_frame;
+	nh_.param<double>("chassis/d", d_, 0.060);
+	nh_.param<double>("chassis/Cd", Cd_, 1.0);
+	nh_.param<double>("chassis/b", b_, 0.162);
+	nh_.param<double>("chassis/Cb", Cb_, 1.0);
+	nh_.param<double>("chassis/delta_max", delta_max_deg, 30.0);
+	nh_.param<int>("odometry/pulses_per_rev", m_, 24);
+	nh_.param<int>("odometry/update_rate", update_rate, 30);
+	nh_.param<std::string>("odometry/base_frame", base_frame, "odom");
+	nh_.param<std::string>("odometry/world_frame", world_frame, "base_footprint");
+	nh_.param<bool>("odometry/publish_tf", publish_tf_, false);
+	
+	if(nh_.hasParam("odometry/pose_covariance_diagonal")) {
+		XmlRpc::XmlRpcValue pose_cov_list;
+		nh_.getParam("odometry/pose_covariance_diagonal", pose_cov_list);
+		ROS_ASSERT(pose_cov_list.getType() == XmlRpc::XmlRpcValue::TypeArray);
+		ROS_ASSERT(pose_cov_list.size() == 6);
+		for (int i = 0; i < pose_cov_list.size(); ++i){
+			// Read as string to handle no decimals and scientific notation
+			std::ostringstream ostr;
+      ostr << pose_cov_list[i];
+      std::istringstream istr(ostr.str());
+      istr >> pose_cov_diag[i];    
+		}
+	}else {
+		ROS_WARN("Pose covariance diagonals not specified for odometry integration. Defaulting to 1e-6.");
+	}
+	
+	if(nh_.hasParam("odometry/twist_covariance_diagonal")) {
+		XmlRpc::XmlRpcValue twist_cov_list;
+		nh_.getParam("odometry/twist_covariance_diagonal", twist_cov_list);
+		ROS_ASSERT(twist_cov_list.getType() == XmlRpc::XmlRpcValue::TypeArray);
+		ROS_ASSERT(twist_cov_list.size() == 6);
+		for (int i = 0; i < twist_cov_list.size(); ++i){
+			// Read as string to handle no decimals and scientific notation
+			std::ostringstream ostr;
+      ostr << twist_cov_list[i];
+      std::istringstream istr(ostr.str());
+      istr >> twist_cov_diag[i];
+		}
+	}else {
+		ROS_WARN("Twist covariance diagonals not specified for odometry integration. Defaulting to 1e-6.");
+	}
+			
 	delta_max_ = delta_max_deg*PI/180.0;
 	publish_period_ = ros::Duration(1.0/update_rate);
 	
@@ -101,16 +141,32 @@ Odometry::Odometry() {
 	first_message_flag_ = true;
 	
 	// Initialize constant message fields
-	odom_trans_.header.frame_id = "odom_integrated";
-	odom_trans_.child_frame_id = "base_footprint";
-	odom_trans_.transform.translation.z = 0.0;
-	odom_msg_.header.frame_id = "odom_integrated";
-	odom_msg_.child_frame_id = "base_footprint";
+	if(publish_tf_) {
+		odom_trans_.header.frame_id = world_frame;
+		odom_trans_.child_frame_id = base_frame;
+		odom_trans_.transform.translation.z = 0.0;
+  }
+	odom_msg_.header.frame_id = world_frame;
+	odom_msg_.child_frame_id = base_frame;
 	odom_msg_.pose.pose.position.z = 0.0;
+	odom_msg_.pose.covariance = boost::assign::list_of
+        (pose_cov_diag[0]) (0)  (0)  (0)  (0)  (0)
+        (0)  (pose_cov_diag[1]) (0)  (0)  (0)  (0)
+        (0)  (0)  (pose_cov_diag[2]) (0)  (0)  (0)
+        (0)  (0)  (0)  (pose_cov_diag[3]) (0)  (0)
+        (0)  (0)  (0)  (0)  (pose_cov_diag[4]) (0)
+        (0)  (0)  (0)  (0)  (0)  (pose_cov_diag[5]);
 	odom_msg_.twist.twist.linear.y = 0.0;
-	odom_msg_.twist.twist.linear.z = 0.0;
+	odom_msg_.twist.twist.linear.z = 0.0; 
 	odom_msg_.twist.twist.angular.x = 0.0;
 	odom_msg_.twist.twist.angular.y = 0.0;
+	odom_msg_.twist.covariance = boost::assign::list_of
+        (twist_cov_diag[0]) (0)  (0)  (0)  (0)  (0)
+        (0)  (twist_cov_diag[1]) (0)  (0)  (0)  (0)
+        (0)  (0)  (twist_cov_diag[2]) (0)  (0)  (0)
+        (0)  (0)  (0)  (twist_cov_diag[3]) (0)  (0)
+        (0)  (0)  (0)  (0)  (twist_cov_diag[4]) (0)
+        (0)  (0)  (0)  (0)  (0)  (twist_cov_diag[5]);
 }
 
 void Odometry::arduinoStateCallback(const ghost::ArduinoState& msg) {
@@ -175,11 +231,13 @@ void Odometry::publishOdom() {
 	geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(psi_);
 
 	// Transform message
-	odom_trans_.header.stamp = update_time_;
-	odom_trans_.transform.translation.x = x_;
-	odom_trans_.transform.translation.y = y_;
-	odom_trans_.transform.rotation = odom_quat;
-	odom_broadcaster_.sendTransform(odom_trans_);
+	if(publish_tf_){
+		odom_trans_.header.stamp = update_time_;
+		odom_trans_.transform.translation.x = x_;
+		odom_trans_.transform.translation.y = y_;
+		odom_trans_.transform.rotation = odom_quat;
+		odom_broadcaster_.sendTransform(odom_trans_);
+  }
 
 	// Odometry message
 	odom_msg_.header.stamp = update_time_;

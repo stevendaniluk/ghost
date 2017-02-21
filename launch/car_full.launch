@@ -1,0 +1,23 @@
+<!-- Launcher for ghost car
+
+Includes:
+  -Car parameters
+  -URDF model
+  -Arduino
+  -Odometry integration
+  -IMU
+  -EKF for odometry estimation
+-->
+
+<launch>
+  
+  <!-- Core car nodes -->
+  <include file="$(find ghost)/launch/car_minimal.launch" />
+  
+  <!-- IMU node -->
+  <include file="$(find ghost)/launch/imu.launch" />
+  
+  <!-- EKF -->
+  <include file="$(find ghost)/launch/includes/robot_localization.launch.xml" />
+  
+</launch>

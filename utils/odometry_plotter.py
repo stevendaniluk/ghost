@@ -25,7 +25,8 @@ __usage__ = """
 
 raw_topic = "/arduino_state"
 integrated_topic = "/odometry/integrated"
-valid_topics = [raw_topic, integrated_topic]
+filtered_topic = "/odometry/filtered"
+valid_topics = [raw_topic, integrated_topic, filtered_topic]
 
 ###########################################
 
@@ -73,21 +74,26 @@ def getPoses(bag_name, params):
 	# See which plots need to be made
 	plot_raw = False
 	plot_integrated = False
+	plot_filtered = False
 	info_dict = yaml.load(subprocess.Popen(['rosbag', 'info', '--yaml', bag_name], stdout=subprocess.PIPE).communicate()[0])
 	for topic_dict in info_dict["topics"]:
 		if raw_topic in topic_dict["topic"]:
 			plot_raw = True
 		if integrated_topic in topic_dict["topic"]:
 			plot_integrated = True
+		if filtered_topic in topic_dict["topic"]:
+			plot_filtered = True
 	
 	# Load the bag
 	bag = rosbag.Bag(bag_name)
 	
 	# Loop through bag data
 	raw_initialized = False
-	int_initialized = False
+	integrated_initialized = False
+	filtered_initialized = False
 	raw_poses = np.zeros((1,3))         # [x, y, psi]
 	integrated_poses = np.zeros((1,3))  # [x, y, psi]
+	filtered_poses = np.zeros((1,3))    # [x, y, psi]
 	for topic, msg, time in bag.read_messages(topics = valid_topics):			
 		
 		# Integrate raw data to get raw poses
@@ -127,37 +133,58 @@ def getPoses(bag_name, params):
 						
 		# Get integrated odometry poses
 		if plot_integrated and topic == integrated_topic:
-			
 			# Need the first pose and orientation to adjust future messages 
 			# (in case the initial pose is not at the origin)
-			if not int_initialized:
+			if not integrated_initialized:
 				# Save the initial pose
 				(r_dud, p_dud, initial_yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
-				initial_pose = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, initial_yaw])
+				integrated_initial_pose = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, initial_yaw])
 				
 				# Precompute the rotation matrix to adjust future messages
-				rot = np.array([[math.cos(initial_yaw), math.sin(initial_yaw), 0.0], [-math.sin(initial_yaw), math.cos(initial_yaw), 0.0], [0.0, 0.0, 1.0]])
-				int_initialized = True
+				integrated_rot = np.array([[math.cos(initial_yaw), math.sin(initial_yaw), 0.0], [-math.sin(initial_yaw), math.cos(initial_yaw), 0.0], [0.0, 0.0, 1.0]])
+				integrated_initialized = True
 			
 			# Get new pose and orientation
 			(r_dud, p_dud, new_yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
 			new_pose = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, new_yaw])
 			
 			# Correct the pose, and add to data
-			corrected_pose = np.matmul(rot, new_pose - initial_pose)
+			corrected_pose = np.matmul(integrated_rot, new_pose - integrated_initial_pose)
 			integrated_poses = np.vstack([integrated_poses, corrected_pose])
+		
+		# Get filtered odometry poses
+		if plot_filtered and topic == filtered_topic:
+			# Need the first pose and orientation to adjust future messages 
+			# (in case the initial pose is not at the origin)
+			if not filtered_initialized:
+				# Save the initial pose
+				(r_dud, p_dud, initial_yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
+				filtered_initial_pose = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, initial_yaw])
+				
+				# Precompute the rotation matrix to adjust future messages
+				filtered_rot = np.array([[math.cos(initial_yaw), math.sin(initial_yaw), 0.0], [-math.sin(initial_yaw), math.cos(initial_yaw), 0.0], [0.0, 0.0, 1.0]])
+				filtered_initialized = True
+			
+			# Get new pose and orientation
+			(r_dud, p_dud, new_yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
+			new_pose = np.array([msg.pose.pose.position.x, msg.pose.pose.position.y, new_yaw])
+			
+			# Correct the pose, and add to data
+			corrected_pose = np.matmul(filtered_rot, new_pose - filtered_initial_pose)
+			filtered_poses = np.vstack([filtered_poses, corrected_pose])
 					
 	bag.close()
 		
-	return raw_poses, integrated_poses
+	return raw_poses, integrated_poses, filtered_poses
 
 ###########################################
 
-def plotPoses(bag_name, raw_poses, integrated_poses, skip_pt):
+def plotPoses(bag_name, raw_poses, integrated_poses, filtered_poses, skip_pt):
 	# Trim the data
 	if skip_pt != 0:
 		raw_poses = raw_poses[range(0, raw_poses.shape[0], skip_pt)]
 		integrated_poses = integrated_poses[range(0, integrated_poses.shape[0], skip_pt)]
+		filtered_poses = filtered_poses[range(0, filtered_poses.shape[0], skip_pt)]
 	
 	plt.figure()	
 	plt.title(os.path.basename(bag_name))
@@ -171,6 +198,10 @@ def plotPoses(bag_name, raw_poses, integrated_poses, skip_pt):
 	# Plot the integrated poses
 	if integrated_poses.shape[0] > 1:
 		plt.plot(integrated_poses[:,0], integrated_poses[:, 1], "rx", label = "Integrated")
+	
+	# Plot the filtered poses
+	if filtered_poses.shape[0] > 1:
+		plt.plot(filtered_poses[:,0], filtered_poses[:, 1], "gx", label = "Filtered")
 	
 	plt.legend()
 	plt.axis('equal')
@@ -196,9 +227,9 @@ if __name__ == '__main__':
 	# Loop through bags	
 	for name in bag_names:
 		# Get poses from each bag
-		raw_poses, integrated_poses = getPoses(name, params)
+		raw_poses, integrated_poses, filtered_poses = getPoses(name, params)
 		# Plot the poses
-		plotPoses(name, raw_poses, integrated_poses, args.skip_pt)
+		plotPoses(name, raw_poses, integrated_poses, filtered_poses, args.skip_pt)
 		
 	plt.show()
 		

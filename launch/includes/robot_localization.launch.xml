@@ -1,0 +1,12 @@
+<!-- Launcher robot_localization package -->
+
+<launch>
+  <!-- EKF -->
+  <node 
+    pkg="robot_localization" 
+    type="ekf_localization_node" 
+    name="ekf" 
+    clear_params="true">
+    <rosparam command="load" file="$(find ghost)/param/ekf_params.yaml"/>
+  </node>
+</launch>

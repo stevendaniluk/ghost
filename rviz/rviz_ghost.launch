@@ -1,0 +1,10 @@
+<!-- Load the Ghost RVIZ Config -->
+
+<launch>
+  <node 
+    name="rviz" 
+    pkg="rviz" 
+    type="rviz" 
+    args="-d $(find ghost)/rviz/ghost.rviz"
+  />
+</launch>
