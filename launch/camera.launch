@@ -1,0 +1,60 @@
+<!-- Main launcher for camera 
+
+Includes:
+  -Nodelet manager
+  -Camera
+  -Debayer
+  -Rectification
+-->
+<launch>
+  
+  <arg name="camera_name"    value="camera" />
+  <arg name="manager"        value="camera_nodelet_manager" />
+  <arg name="camera_serial"  default="16455904" />
+  <arg name="calibrated"     default="true" />
+
+  <group ns="$(arg camera_name)">
+    
+    <!-- Nodelet manager for the camera-->
+    <node 
+      pkg="nodelet" 
+      type="nodelet" 
+      name="$(arg manager)" 
+      args="manager" 
+      output="screen"
+    />
+    
+    <!--- Pointgrey Camera -->
+    <node 
+      pkg="nodelet" 
+      type="nodelet" 
+      name="camera_nodelet"
+      args="load pointgrey_camera_driver/PointGreyCameraNodelet $(arg manager)" >
+      <param name="camera_info_url" if="$(arg calibrated)"
+             value="file://$(env HOME)/.ros/camera_info/$(arg camera_serial).yaml" />
+      <param name="frame_id" value="camera" />
+      <param name="serial" value="$(arg camera_serial)" />
+      <!-- <param name="frame_rate" value="50" /> -->
+    </node>
+    
+    <!-- Debayer -->
+    <node 
+      pkg="nodelet" 
+      type="nodelet"
+      name="image_proc_debayer"
+      args="load image_proc/debayer $(arg manager)">
+      <!-- <remap from="image_mono" to="something/else"/> -->
+    </node>
+    
+    <!-- Rectification -->
+    <node 
+      pkg="nodelet" 
+      type="nodelet" 
+      name="image_proc_rectify" 
+      args="load image_proc/rectify $(arg manager)">
+      <remap from="image_rect" to="image_rect_mono" />
+    </node>
+    
+  </group>
+
+</launch>

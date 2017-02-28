@@ -69,10 +69,6 @@ add_executable(odometry_integration src/odometry_integration.cpp)
 add_dependencies(odometry_integration ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(odometry_integration ${catkin_LIBRARIES})
 
-# Executable for saving camera images
-add_executable(camera_frame_grabber src/camera_frame_grabber.cpp)
-target_link_libraries(camera_frame_grabber ${catkin_LIBRARIES})
-
 # Nodelet library
 add_library(lane_detector_nodelet src/lane_detector_nodelet.cpp)
 target_link_libraries(lane_detector_nodelet ${catkin_LIBRARIES})
