@@ -1,26 +1,33 @@
 <!-- Main launcher the Lane Detector
 
--Assumes a nodelet manager is already running
+Includes:
+  -Camera (containing nodelet manager and processing nodes)
+  -Lane detector nodelet
+     -Subscribes to image_rect_mono
 -->
 <launch>
   
-  <!-- Set the names of the camera and nodelet -->
-  <arg name="camera"        value="camera" />
-  <arg name="manager"       value="camera_manager" />
+  <!-- Set the names of the camera and nodelet manager-->
+  <arg name="camera_name"  value="camera" />
+  <arg name="manager"      value="camera_nodelet_manager" />
+  
+  <!-- Camera -->
+  <include file="$(find ghost)/launch/camera.launch" >
+    <arg name="manager"      value="$(arg manager)" />
+    <arg name="camera_name"  value="$(arg camera_name)" />
+  </include>
+  
+  <!-- Parameters -->
+  <rosparam file="$(find ghost)/param/lane_detector_params.yaml" command="load"/>
   
   <!-- Lane Detector -->
   <node 
     pkg="nodelet" 
     type="nodelet" 
     name="lane_detector" 
-    args="load ghost/LaneDetector $(arg manager)" 
+    args="load ghost/LaneDetector $(arg camera_name)/$(arg manager)" 
     output="screen">
-    <remap from="image_rect_mono" to="$(arg camera)/color/image_rect"/>
+    <!--<remap from="image_rect_mono" to="something/else"/>-->
   </node>
-
-  <!-- Load the parameters -->
-  <rosparam 
-      file="$(find ghost)/param/lane_detector_params.yaml"
-      command="load"/>
 
 </launch>

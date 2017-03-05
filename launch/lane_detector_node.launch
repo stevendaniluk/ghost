@@ -1,19 +1,20 @@
-<launch>
-  <!-- Lane detector nodelet
+<!-- Lane detector node
 
   Subsribes to topic "image_rect_mono"
-  -->
+-->
+
+<launch>
+  
+  <!-- Parameters -->
+  <rosparam file="$(find ghost)/param/lane_detector_params.yaml" command="load"/>
+  
+  <!-- Lane detector -->
   <node
     pkg="ghost" 
     type="lane_detector_node" 
     name="lane_detector" 
     output="screen">
-    <remap from="image_rect_mono" to="camera/color/image_rect"/>
+    <remap from="image_rect_mono" to="camera/image_rect_mono" /> 
   </node>
-  
-  <!-- Load the parameters -->
-  <rosparam 
-      file="$(find ghost)/param/lane_detector_params.yaml" 
-      command="load"/>
 
 </launch>

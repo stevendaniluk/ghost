@@ -4,6 +4,7 @@ project(ghost)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
+  dynamic_reconfigure
   image_transport
   message_generation
   nav_msgs
@@ -26,6 +27,11 @@ add_message_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+)
+
+## Declare dynamic reconfigure parameters
+generate_dynamic_reconfigure_options(
+  cfg/LaneDetector.cfg
 )
 
 # Declare the catkin package
@@ -69,10 +75,12 @@ add_executable(odometry_integration src/odometry_integration.cpp)
 add_dependencies(odometry_integration ${PROJECT_NAME}_generate_messages_cpp)
 target_link_libraries(odometry_integration ${catkin_LIBRARIES})
 
-# Nodelet library
+# Lane detector nodelet
 add_library(lane_detector_nodelet src/lane_detector_nodelet.cpp)
+add_dependencies(lane_detector_nodelet ${PROJECT_NAME}_gencfg)
 target_link_libraries(lane_detector_nodelet ${catkin_LIBRARIES})
 
 # Node wrapper for lane detector nodelet
 add_executable(lane_detector_node src/lane_detector_node.cpp)
+add_dependencies(lane_detector_node ${PROJECT_NAME}_gencfg)
 target_link_libraries(lane_detector_node ${catkin_LIBRARIES})

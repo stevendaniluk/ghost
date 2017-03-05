@@ -18,6 +18,7 @@
   
   <!-- Build Dependencies -->
   <build_depend>cv_bridge</build_depend>
+  <build_depend>dynamic_reconfigure</build_depend>
   <build_depend>image_transport</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>nav_msgs</build_depend>
@@ -31,6 +32,7 @@
   
   <!-- Run Time Dependencies -->
   <run_depend>cv_bridge</run_depend>
+  <run_depend>dynamic_reconfigure</run_depend>
   <run_depend>image_proc</run_depend>
   <run_depend>image_transport</run_depend>
   <run_depend>imu_filter_madgwick</run_depend>

@@ -8,8 +8,8 @@ Includes:
 -->
 <launch>
   
-  <arg name="camera_name"    value="camera" />
-  <arg name="manager"        value="camera_nodelet_manager" />
+  <arg name="camera_name"    default="camera" />
+  <arg name="manager"        default="camera_nodelet_manager" />
   <arg name="camera_serial"  default="16455904" />
   <arg name="calibrated"     default="true" />
 
@@ -29,12 +29,18 @@ Includes:
       pkg="nodelet" 
       type="nodelet" 
       name="camera_nodelet"
-      args="load pointgrey_camera_driver/PointGreyCameraNodelet $(arg manager)" >
+      args="load pointgrey_camera_driver/PointGreyCameraNodelet $(arg manager)">
       <param name="camera_info_url" if="$(arg calibrated)"
              value="file://$(env HOME)/.ros/camera_info/$(arg camera_serial).yaml" />
       <param name="frame_id" value="camera" />
       <param name="serial" value="$(arg camera_serial)" />
-      <!-- <param name="frame_rate" value="50" /> -->
+      <param name="frame_rate" value="25" />
+      
+      <!-- Full resolution: 808x608 -->
+      <param name="format7_roi_height" value="450" />
+      <param name="format7_roi_width" value="808" />
+      <param name="format7_x_offset" value="0" />
+      <param name="format7_y_offset" value="158" />
     </node>
     
     <!-- Debayer -->
