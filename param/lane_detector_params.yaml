@@ -3,12 +3,12 @@
 lane_detector:
 
 # Misc. Parameters
-  debug: false          # Output debugging log messages
-  bev_ppm: 200          # Pixels-per-meter for Bird's Eye View image
-  use_BEV_image: false  # If the BEV image should be used for edge detection and scanning
+  debug: false            # Output debugging log messages
+  bev_ppm: 200            # Pixels-per-meter for Bird's Eye View image
+  imu_topic: "/imu/data"  # IMU topic to subscribe to
   
-# Scanner Parameters
-  min_range: 0.2           # Minimum detactable range for scanner [m]
-  max_range: 3.0           # Maximum detactable range for scanner [m]
-  scan_res: 100            # Resolution of scan within camera FOV
-  scan_frame_id: "scanner" # Name of the frame to attach to the scan message
+# Detection Parameters
+  min_range: 0.3                   # Minimum detactable range [m]
+  max_range: 4.0                   # Maximum detactable range [m]
+  detect_dx: 0.10                  # Depth distances between lane detection points [m]
+  detect_frame_id: "camera_ground" # Name of the frame to attach to the pointcloud message

@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   nav_msgs
   nodelet
+  pcl_ros
   roscpp
   rosserial_arduino
   rosserial_client

@@ -70,7 +70,7 @@
 <xacro:property name="camera_x" value="0.15" />
 <xacro:property name="camera_y" value="0" />
 <xacro:property name="camera_z" value="0.1452" />
-<xacro:property name="camera_pitch" value="${11.008*pi/180.0}" />
+<xacro:property name="camera_pitch" value="${9.00*pi/180.0}" />
 
 <link name="camera">
   <visual>
@@ -89,11 +89,11 @@
 
 <!-- Scanner from camera -->
 <!-- Origin is on the ground plane directly below the camera -->
-<link name="scanner">
+<link name="camera_ground">
 </link>
-<joint name="scanner_origin" type="fixed">
+<joint name="camera_ground_origin" type="fixed">
   <parent link="camera"/>
-  <child link="scanner"/>
+  <child link="camera_ground"/>
   <origin rpy="0 ${-camera_pitch} 0" xyz="0 0 ${-camera_z}"/>
 </joint>
 
