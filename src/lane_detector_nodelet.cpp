@@ -113,8 +113,10 @@ class LaneDetector : public nodelet::Nodelet {
 	sensor_msgs::LaserScan laserscan_msg_;    // LaserScan message containing lane points
 
 	// Miscellaneous
-	bool initialized_;   // Flag for if the transforms and detector have been initialized
-	std::string imu_topic_;
+	bool initialized_;       // Flag for if the transforms and detector have been initialized
+	bool use_imu_;           // If the IMU should be used to adjust camera pitch and roll
+	std::string imu_topic_;  // Topic name to subscribe to
+	bool imu_effect_reset_;  // Flag for resetting the transformations when IMU not used
 	
 	// Method declarations
 	void onInit();
@@ -139,6 +141,7 @@ void LaneDetector::onInit(){
 	pnh_ = getPrivateNodeHandle();
 	
 	initialized_ = false;
+	imu_effect_reset_ = false;
 	
 	// Load configuration parameters from the parameter server
 	bool debug;
@@ -188,6 +191,11 @@ void LaneDetector::onInit(){
 * Callback for updating parameters with Dynamic Reconfigure
 */
 void LaneDetector::reconfigureCallback(ghost::LaneDetectorConfig &config, uint32_t level) {	
+	if(use_imu_ && !config.use_imu)
+		imu_effect_reset_ = true;
+	
+	use_imu_ = config.use_imu;
+		
 	apply_gauss_ = config.apply_gauss;
 	gauss_k_size_ = config.gauss_k_size;
 	gauss_sigma_x_ = config.gauss_sigma_x;
@@ -202,37 +210,61 @@ void LaneDetector::reconfigureCallback(ghost::LaneDetectorConfig &config, uint32
 
 /* imuCallback
 *
-* Callback for IMU messages to account for changes in camera pitch and roll
+* Callback for IMU messages to account for changes in camera pitch and roll.
+* When the IMU is not used the transformations will need to be reset once.
 */
 void LaneDetector::imuCallback(const sensor_msgs::Imu::ConstPtr &msg) {
 	if(initialized_) {
-		// Convert from geometry_msgs to tf quaternion
-		tf::Quaternion quat;
-		tf::quaternionMsgToTF(msg->orientation, quat);
-		
-		// Convert from quaternion to roll-pitch-yaw
-		double delta_roll, delta_pitch, yaw_dud;
-		tf::Matrix3x3(quat).getRPY(delta_roll, delta_pitch, yaw_dud);
-						
-		// Repeat the formation of the intermediate transforms from initializeTransforms, 
-		// accounting for changes int the pitch and roll, and using the static yaw angle
-		// in Rz_cw_. See initializeTransforms for more comments.
-		const double gamma = -(PI/2.0 + cam_pitch_ + delta_pitch);
-		const cv::Mat Rx_cw = (cv::Mat_<double>(3, 3) <<
-			1.0,     0.0,        0.0,
-			0.0, cos(gamma), -sin(gamma),
-			0.0, sin(gamma),  cos(gamma));
-		
-		const double beta = cam_roll_ + delta_roll;
-		const cv::Mat Ry_cw = (cv::Mat_<double>(3, 3) <<
-			 cos(beta), 0.0, sin(beta),
-			    0.0,    1.0,    0.0,
-			-sin(beta), 0.0, cos(beta));
-		
-		const cv::Mat R_cw = Rz_cw_*Ry_cw*Rx_cw;
-		
-		A_cw_ = R_cw*K_i_;
-		A_wc_ = K_*R_cw.t();
+		if(use_imu_){
+			// Convert from geometry_msgs to tf quaternion
+			tf::Quaternion quat;
+			tf::quaternionMsgToTF(msg->orientation, quat);
+			
+			// Convert from quaternion to roll-pitch-yaw
+			double delta_roll, delta_pitch, yaw_dud;
+			tf::Matrix3x3(quat).getRPY(delta_roll, delta_pitch, yaw_dud);
+							
+			// Repeat the formation of the intermediate transforms from initializeTransforms, 
+			// accounting for changes int the pitch and roll, and using the static yaw angle
+			// in Rz_cw_. See initializeTransforms for more comments.
+			const double gamma = -(PI/2.0 + cam_pitch_ + delta_pitch);
+			const cv::Mat Rx_cw = (cv::Mat_<double>(3, 3) <<
+				1.0,     0.0,        0.0,
+				0.0, cos(gamma), -sin(gamma),
+				0.0, sin(gamma),  cos(gamma));
+			
+			const double beta = cam_roll_ + delta_roll;
+			const cv::Mat Ry_cw = (cv::Mat_<double>(3, 3) <<
+				 cos(beta), 0.0, sin(beta),
+						0.0,    1.0,    0.0,
+				-sin(beta), 0.0, cos(beta));
+			
+			const cv::Mat R_cw = Rz_cw_*Ry_cw*Rx_cw;
+			
+			A_cw_ = R_cw*K_i_;
+			A_wc_ = K_*R_cw.t();
+		}else if(imu_effect_reset_) {
+			// Reset the transformations to their static value
+			
+			const double gamma = -(PI/2.0 + cam_pitch_);
+			const cv::Mat Rx_cw = (cv::Mat_<double>(3, 3) <<
+				1.0,     0.0,        0.0,
+				0.0, cos(gamma), -sin(gamma),
+				0.0, sin(gamma),  cos(gamma));
+			
+			const double beta = cam_roll_;
+			const cv::Mat Ry_cw = (cv::Mat_<double>(3, 3) <<
+				 cos(beta), 0.0, sin(beta),
+						0.0,    1.0,    0.0,
+				-sin(beta), 0.0, cos(beta));
+			
+			const cv::Mat R_cw = Rz_cw_*Ry_cw*Rx_cw;
+			
+			A_cw_ = R_cw*K_i_;
+			A_wc_ = K_*R_cw.t();
+			
+			imu_effect_reset_ = false;
+		}
 	}
 }
 
@@ -290,12 +322,12 @@ void LaneDetector::imageCb(const sensor_msgs::ImageConstPtr& image_msg, const se
 	
 	// Get the image
 	cv::Mat img;
-  try {
-  	img = cv_bridge::toCvShare(image_msg, sensor_msgs::image_encodings::MONO8)->image;
-  } catch (cv_bridge::Exception& e) {
-  	NODELET_WARN("cv_bridge exception: %s", e.what());
-  	return;
-  }
+	try {
+		img = cv_bridge::toCvShare(image_msg, sensor_msgs::image_encodings::MONO8)->image;
+	} catch (cv_bridge::Exception& e) {
+		NODELET_WARN("cv_bridge exception: %s", e.what());
+		return;
+	}
 	
 	// Perform any image debugging
 	if(pub_bev_.getNumSubscribers() ||
@@ -324,8 +356,6 @@ bool LaneDetector::initializeTransforms(const sensor_msgs::CameraInfoConstPtr& i
 	if(info_msg->K[0] == 0 || info_msg->width == 0 || info_msg->height == 0)
 		return false;
 	
-	NODELET_INFO("Initializing the camera transformations");
-	
 	// Set camera properties
 	if(info_msg->roi.width == 0 && info_msg->roi.height == 0) {
 		cam_w_ = info_msg->width;
@@ -336,6 +366,7 @@ bool LaneDetector::initializeTransforms(const sensor_msgs::CameraInfoConstPtr& i
 	}
 	cam_y_offset_ = info_msg->roi.y_offset;
 	cam_x_offset_ = info_msg->roi.x_offset;
+	NODELET_DEBUG("ROI: %dx%d, x_offset=%d, y_offset=%d", cam_w_, cam_h_, cam_x_offset_, cam_y_offset_);
 	
 	// Form intrinsic matrix, and invert it
 	K_ = (cv::Mat_<double>(3,3) <<
@@ -359,14 +390,14 @@ bool LaneDetector::initializeTransforms(const sensor_msgs::CameraInfoConstPtr& i
 	const double beta = cam_roll_;
 	const cv::Mat Ry_cw = (cv::Mat_<double>(3, 3) <<
 		 cos(beta), 0.0, sin(beta),
-		    0.0,    1.0,    0.0,
+				0.0,    1.0,    0.0,
 		-sin(beta), 0.0, cos(beta));
 	
 	const double alpha = -PI/2.0 + cam_yaw_;
 	Rz_cw_ = (cv::Mat_<double>(3, 3) <<
 		cos(alpha), -sin(alpha), 0.0,
 		sin(alpha), cos(alpha),  0.0,
-		    0.0,        0.0,     1.0);
+				0.0,        0.0,     1.0);
 	
 	// Precompute rotation matrix for camera wrt world frame
 	const cv::Mat R_cw = Rz_cw_*Ry_cw*Rx_cw;
@@ -449,6 +480,7 @@ bool LaneDetector::initializeTransforms(const sensor_msgs::CameraInfoConstPtr& i
 	cam_FOV_ = 2*atan2(0.5*cam_max_width_, max_range_);
 	NODELET_DEBUG("Camera FOV: %.3f deg", (cam_FOV_)*180.0/PI);
 	
+	NODELET_INFO("Initialized the camera transformations");
 	return true;
 }// end initializeTransforms
 
@@ -458,9 +490,7 @@ bool LaneDetector::initializeTransforms(const sensor_msgs::CameraInfoConstPtr& i
 * desired spatial resolution. Also fills in portions of the pointcloud messages
 * that will not change.
 */
-bool LaneDetector::initializeDetector() {
-	NODELET_INFO("Initializing detector.");
-		
+bool LaneDetector::initializeDetector() {			
 	// Find which rows to scan
 	const int num_pts = std::floor((max_range_ - min_range_)/detect_dx_);
 	double x = min_range_;
@@ -496,6 +526,7 @@ bool LaneDetector::initializeDetector() {
 	laserscan_msg_.range_max = max_range_/cos(1.1*cam_FOV_/2);  // Bump up a bit to account for distortion
 	laserscan_msg_.ranges.resize(laserscan_res);
 	
+	NODELET_INFO("Detector initialized.");
 	return true;
 }
 
@@ -696,7 +727,8 @@ void LaneDetector::detectLanes(cv::Mat &img, const std_msgs::Header &header) {
 				laserscan_msg_.ranges[ray_index] = sqrt(pow(left_world[index].x, 2) + pow(left_world[index].y, 2));
 			}
 		}
-				
+		
+		laserscan_msg_.header.stamp = header.stamp;
 		pub_laserscan_.publish(laserscan_msg_);
 	}
 	
