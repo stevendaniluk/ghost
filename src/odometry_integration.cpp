@@ -140,12 +140,20 @@ Odometry::Odometry() {
 	update_flag_ = true;
 	first_message_flag_ = true;
 	
-	// Initialize constant message fields
+	// Initialize message fields, and publish an initial transform
 	if(publish_tf_) {
 		odom_trans_.header.frame_id = world_frame;
 		odom_trans_.child_frame_id = base_frame;
 		odom_trans_.transform.translation.z = 0.0;
+		odom_trans_.transform.translation.x = x_;
+		odom_trans_.transform.translation.y = y_;
+		
+		geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(psi_);
+		odom_trans_.transform.rotation = odom_quat;
+		
+		odom_broadcaster_.sendTransform(odom_trans_);
   }
+  
 	odom_msg_.header.frame_id = world_frame;
 	odom_msg_.child_frame_id = base_frame;
 	odom_msg_.pose.pose.position.z = 0.0;
@@ -255,7 +263,7 @@ int main(int argc, char** argv){
 	
 	// Create the odometry object
 	Odometry odom;
-	
+		
 	// Spin and publish
 	ros::Time last_publish_time;
 	while(ros::ok()) {
