@@ -52,10 +52,10 @@ on the servo and esc, an override flag, and the encoder pulses.
 #define OVERRIDE_PIN 4
 #define STEERING_OUT_PIN 5
 #define THROTTLE_OUT_PIN 6
-#define FL_ENCODER_PIN 7
-#define FR_ENCODER_PIN 8
-#define RL_ENCODER_PIN 9
-#define RR_ENCODER_PIN 10
+#define FL_ENCODER_PIN 9
+#define FR_ENCODER_PIN 10
+#define RL_ENCODER_PIN 8
+#define RR_ENCODER_PIN 7
 
 // Set PWM and servo parameters
 const uint8_t steering_max = 137;           // Max steering value for arduino lirary [0,255]
