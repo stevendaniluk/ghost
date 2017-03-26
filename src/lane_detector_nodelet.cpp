@@ -40,6 +40,8 @@
 
 typedef pcl::PointCloud<pcl::PointXY> PointCloudXY;
 typedef pcl::PointCloud<pcl::PointXYZ> PointCloudXYZ;
+typedef ghost::LaneDetectorConfig Config;
+typedef dynamic_reconfigure::Server<Config> ReconfigureServer;
 
 namespace ghost {
 
@@ -91,36 +93,31 @@ class LaneDetector : public nodelet::Nodelet {
 	int bev_ppm_;         // Pixel-per-meter for transformed image
 	cv::Mat H_bev_;       // BEV transformation matrix		
 	
-	// Image filtering parameters 
-	enum canny_thresh_enum {OTSU, MEDIAN, MEAN, MANUAL};
-	bool apply_gauss_;              // Flag for applying Gaussian filter
-	int gauss_k_size_;              // Size of kernal for Gaussian blur
-	double gauss_sigma_x_;          // Gaussian kernel standar deviation in the X direction
-	double gauss_sigma_y_;          // Gaussian kernel standar deviation in the Y direction
-	int canny_type_;                // Enum for canny threshold calculation method
-	int canny_lower_;               // Lower threshold for Canny edge detection (during manual mode)
-	int canny_upper_;               // Upper threshold for Canny edge detection (during manual mode)    
-	
 	// Detection properties
 	double max_range_;                        // Maximum detectable range
 	double min_range_;                        // Minimum detectable range
 	std::string detect_frame_id_;             // Name of the frame to attach to the lane points message
 	std::vector<int> scan_rows_;              // Pixel rows to detect lanes in
 	double detect_dx_;                        // Depth distance between lane detections
-	double lane_centre_alpha_;                // Coefficient for exponential moving average of lane centreline
 	PointCloudXY pc_msg_;                     // Pointcloud message containing lane points
 	PointCloudXYZ pc_vis_msg_;                // 3D version of pc_msg_ for visualization with RVIZ
 	sensor_msgs::LaserScan laserscan_msg_;    // LaserScan message containing lane points
-
+	
 	// Miscellaneous
-	bool initialized_;       // Flag for if the transforms and detector have been initialized
-	bool use_imu_;           // If the IMU should be used to adjust camera pitch and roll
-	std::string imu_topic_;  // Topic name to subscribe to
-	bool imu_effect_reset_;  // Flag for resetting the transformations when IMU not used
+	enum canny_thresh_enum {OTSU, MEDIAN, MEAN, MANUAL};
+	bool initialized_;              // Flag for if the transforms and detector have been initialized
+	std::string imu_topic_;         // Topic name to subscribe to
+	bool imu_effect_reset_;         // Flag for resetting the transformations when IMU not used
+	boost::mutex transform_mutex_;  // For locking the transforms during reads/writes
+	
+	// Dynamic reconfigure
+	boost::recursive_mutex config_mutex_;
+	boost::shared_ptr<ReconfigureServer> reconfigure_server_;
+	Config config_;
 	
 	// Method declarations
 	void onInit();
-	void reconfigureCallback(ghost::LaneDetectorConfig &config, uint32_t level);
+	void reconfigureCallback(Config &config, uint32_t level);
 	void imuCallback(const sensor_msgs::Imu::ConstPtr &msg);
 	void connectCb();
 	void imageCb(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info_msg);
@@ -143,7 +140,7 @@ void LaneDetector::onInit(){
 	initialized_ = false;
 	imu_effect_reset_ = false;
 	
-	// Load configuration parameters from the parameter server
+	// Load static configuration parameters from the parameter server
 	bool debug;
 	pnh_.param<bool>("debug", debug, false);
 	pnh_.param<int>("bev_ppm", bev_ppm_, 100);
@@ -154,11 +151,9 @@ void LaneDetector::onInit(){
 	pnh_.param<std::string>("imu_topic", imu_topic_, "/imu/data");
 	
 	// Setup dynamic reconfigure
-	dynamic_reconfigure::Server<ghost::LaneDetectorConfig> *server;
-	server = new dynamic_reconfigure::Server<ghost::LaneDetectorConfig>(pnh_);
-	dynamic_reconfigure::Server<ghost::LaneDetectorConfig>::CallbackType f;
-	f = boost::bind(&LaneDetector::reconfigureCallback, this, _1, _2);
-	server->setCallback(f);	
+	reconfigure_server_.reset(new ReconfigureServer(config_mutex_, pnh_));
+	ReconfigureServer::CallbackType f = boost::bind(&LaneDetector::reconfigureCallback, this, _1, _2);
+	reconfigure_server_->setCallback(f);
 	
 	// Manage debugging logger level
 	if(debug){
@@ -190,22 +185,19 @@ void LaneDetector::onInit(){
 *
 * Callback for updating parameters with Dynamic Reconfigure
 */
-void LaneDetector::reconfigureCallback(ghost::LaneDetectorConfig &config, uint32_t level) {	
-	if(use_imu_ && !config.use_imu)
-		imu_effect_reset_ = true;
+void LaneDetector::reconfigureCallback(Config &config_in, uint32_t level) {	
+	config_.use_imu = config_in.use_imu;
 	
-	use_imu_ = config.use_imu;
-		
-	apply_gauss_ = config.apply_gauss;
-	gauss_k_size_ = config.gauss_k_size;
-	gauss_sigma_x_ = config.gauss_sigma_x;
-	gauss_sigma_y_ = config.gauss_sigma_y;
+	config_.apply_gauss = config_in.apply_gauss;
+	config_.gauss_k_size = config_in.gauss_k_size;
+	config_.gauss_sigma_x = config_in.gauss_sigma_x;
+	config_.gauss_sigma_y = config_in.gauss_sigma_y;
 	
-	canny_type_ = config.canny_threshold;
-	canny_lower_ = config.canny_lower;
-	canny_upper_ = config.canny_upper;
+	config_.canny_threshold = config_in.canny_threshold;
+	config_.canny_lower = config_in.canny_lower;
+	config_.canny_upper = config_in.canny_upper;
 	
-	lane_centre_alpha_ = config.lane_centre_alpha;
+	config_.lane_centre_alpha = config_in.lane_centre_alpha;
 }
 
 /* imuCallback
@@ -214,38 +206,50 @@ void LaneDetector::reconfigureCallback(ghost::LaneDetectorConfig &config, uint32
 * When the IMU is not used the transformations will need to be reset once.
 */
 void LaneDetector::imuCallback(const sensor_msgs::Imu::ConstPtr &msg) {
-	if(initialized_) {
-		if(use_imu_){
-			// Convert from geometry_msgs to tf quaternion
-			tf::Quaternion quat;
-			tf::quaternionMsgToTF(msg->orientation, quat);
-			
-			// Convert from quaternion to roll-pitch-yaw
-			double delta_roll, delta_pitch, yaw_dud;
-			tf::Matrix3x3(quat).getRPY(delta_roll, delta_pitch, yaw_dud);
-							
-			// Repeat the formation of the intermediate transforms from initializeTransforms, 
-			// accounting for changes int the pitch and roll, and using the static yaw angle
-			// in Rz_cw_. See initializeTransforms for more comments.
-			const double gamma = -(PI/2.0 + cam_pitch_ + delta_pitch);
-			const cv::Mat Rx_cw = (cv::Mat_<double>(3, 3) <<
-				1.0,     0.0,        0.0,
-				0.0, cos(gamma), -sin(gamma),
-				0.0, sin(gamma),  cos(gamma));
-			
-			const double beta = cam_roll_ + delta_roll;
-			const cv::Mat Ry_cw = (cv::Mat_<double>(3, 3) <<
-				 cos(beta), 0.0, sin(beta),
-						0.0,    1.0,    0.0,
-				-sin(beta), 0.0, cos(beta));
-			
-			const cv::Mat R_cw = Rz_cw_*Ry_cw*Rx_cw;
-			
+	bool use_imu;
+	{
+		boost::lock_guard<boost::recursive_mutex> lock(config_mutex_);
+		use_imu = config_.use_imu;
+	}
+	
+	if(use_imu) {
+		// Convert from geometry_msgs to tf quaternion
+		tf::Quaternion quat;
+		tf::quaternionMsgToTF(msg->orientation, quat);
+		
+		// Convert from quaternion to roll-pitch-yaw
+		double delta_roll, delta_pitch, yaw_dud;
+		tf::Matrix3x3(quat).getRPY(delta_roll, delta_pitch, yaw_dud);
+		
+		// Repeat the formation of the intermediate transforms from initializeTransforms, 
+		// accounting for changes int the pitch and roll, and using the static yaw angle
+		// in Rz_cw_. See initializeTransforms for more comments.
+		const double gamma = -(PI/2.0 + cam_pitch_ + delta_pitch);
+		const cv::Mat Rx_cw = (cv::Mat_<double>(3, 3) <<
+			1.0,     0.0,        0.0,
+			0.0, cos(gamma), -sin(gamma),
+			0.0, sin(gamma),  cos(gamma));
+		
+		const double beta = cam_roll_ + delta_roll;
+		const cv::Mat Ry_cw = (cv::Mat_<double>(3, 3) <<
+			 cos(beta), 0.0, sin(beta),
+					0.0,    1.0,    0.0,
+			-sin(beta), 0.0, cos(beta));
+		
+		const cv::Mat R_cw = Rz_cw_*Ry_cw*Rx_cw;
+		{
+			boost::mutex::scoped_lock lock(transform_mutex_);
 			A_cw_ = R_cw*K_i_;
 			A_wc_ = K_*R_cw.t();
-		}else if(imu_effect_reset_) {
-			// Reset the transformations to their static value
+		}
+		
+		// Mark that the transforms need to be reset if IMU not used
+		imu_effect_reset_ = true;
+	}else {
+		if(imu_effect_reset_) {
+			NODELET_DEBUG("Resetting camera transforms to static values.");
 			
+			// Reset the transformations to their static value
 			const double gamma = -(PI/2.0 + cam_pitch_);
 			const cv::Mat Rx_cw = (cv::Mat_<double>(3, 3) <<
 				1.0,     0.0,        0.0,
@@ -260,9 +264,12 @@ void LaneDetector::imuCallback(const sensor_msgs::Imu::ConstPtr &msg) {
 			
 			const cv::Mat R_cw = Rz_cw_*Ry_cw*Rx_cw;
 			
-			A_cw_ = R_cw*K_i_;
-			A_wc_ = K_*R_cw.t();
-			
+			{
+				boost::mutex::scoped_lock lock(transform_mutex_);
+				A_cw_ = R_cw*K_i_;
+				A_wc_ = K_*R_cw.t();
+			}
+							
 			imu_effect_reset_ = false;
 		}
 	}
@@ -288,7 +295,10 @@ void LaneDetector::connectCb() {
 		NODELET_INFO("Subscribing to camera topic.");
 		image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
 		sub_camera_ = it_->subscribeCamera("image_rect_mono", 1, &LaneDetector::imageCb, this, hints);
-		sub_imu_ = nh_.subscribe(imu_topic_.c_str(), 50, &LaneDetector::imuCallback, this);
+		if (initialized_) {
+			// Need transforms initialied before altering them with the IMU
+			sub_imu_ = nh_.subscribe(imu_topic_.c_str(), 50, &LaneDetector::imuCallback, this);
+		}
 	}
 }
 
@@ -318,6 +328,9 @@ void LaneDetector::imageCb(const sensor_msgs::ImageConstPtr& image_msg, const se
 		bool T_init = initializeTransforms(info_msg);
 		bool D_init = initializeDetector();
 		initialized_ = T_init && D_init;
+		
+		// Transforms initialized, so the IMU can be subscribed to for the first time
+		sub_imu_ = nh_.subscribe(imu_topic_.c_str(), 50, &LaneDetector::imuCallback, this);
 	}
 	
 	// Get the image
@@ -404,8 +417,11 @@ bool LaneDetector::initializeTransforms(const sensor_msgs::CameraInfoConstPtr& i
 	
 	// Precompute intermediate transformations where R_cw is the rotation of the camera
 	// optical frame wrt world camera frame, and K is the intrinsic matric
-	A_cw_ = R_cw*K_i_;    // For converting pixel coords to world coords
-	A_wc_ = K_*R_cw.t();  // For converting world coords to pixel coords
+	{
+		boost::mutex::scoped_lock lock(transform_mutex_);
+		A_cw_ = R_cw*K_i_;    // For converting pixel coords to world coords
+		A_wc_ = K_*R_cw.t();  // For converting world coords to pixel coords
+	}
 	
 	/* Homography is be determined from the max range and minimum possible camera depth.
 	*  It is assumed that the yaw and roll angles are zero.
@@ -492,16 +508,22 @@ bool LaneDetector::initializeTransforms(const sensor_msgs::CameraInfoConstPtr& i
 */
 bool LaneDetector::initializeDetector() {			
 	// Find which rows to scan
-	const int num_pts = std::floor((max_range_ - min_range_)/detect_dx_);
+	const int max_num_pts = std::floor((max_range_ - min_range_)/detect_dx_);
 	double x = min_range_;
-	NODELET_DEBUG("%d pixel rows will be scanned.", num_pts);
-	for(int i = 0; i < num_pts; i++){
+	int prev_row = 0;
+	int valid_rows = 0;
+	NODELET_DEBUG("Pixel rows to be scanned:");
+	for(int i = 0; i < max_num_pts; i++){
 		// Find pixel coord
 		const cv::Point2f pt_w = cv::Point2f(x, 0);
 		const cv::Point2f pt_p = convertWorldToPixel(pt_w);
-		scan_rows_.push_back(pt_p.y);
+		if(int(pt_p.y) != prev_row) {
+			scan_rows_.push_back(pt_p.y);
+			prev_row = int(pt_p.y);
+			valid_rows++;
+			NODELET_DEBUG("%d) Depth=%.2f, Pixel Row=%d", valid_rows, x, scan_rows_.back());
+		}
 		
-		NODELET_DEBUG("%d) Depth=%.2f, Pixel Row=%.1f", (i + 1), x, pt_p.y);
 		x += detect_dx_;
 	}
 	
@@ -550,19 +572,25 @@ void LaneDetector::detectLanes(cv::Mat &img, const std_msgs::Header &header) {
 	const bool pc_requested = pub_pc_.getNumSubscribers();
 	const bool pc_vis_requested = pub_pc_vis_.getNumSubscribers();
 	const bool laserscan_requested = pub_laserscan_.getNumSubscribers();
-
+	
+	Config config;
+	{
+		boost::lock_guard<boost::recursive_mutex> lock(config_mutex_);
+		config = config_;
+	}
+	
 	// Gaussian smoothing
-	if(apply_gauss_) {
-		cv::GaussianBlur(img, img, cv::Size(gauss_k_size_, gauss_k_size_), gauss_sigma_x_, gauss_sigma_y_);
+	if(config.apply_gauss) {
+		cv::GaussianBlur(img, img, cv::Size(config.gauss_k_size, config.gauss_k_size), config.gauss_sigma_x, config.gauss_sigma_y);
 	}
 	
 	// Apply Canny edge detection
-	if(canny_type_ == OTSU) {
+	if(config.canny_threshold == OTSU) {
 		// Apply Otsu thesholding
 		cv::Mat otsu_img;
 		const double otsu_thresh = cv::threshold(img, otsu_img, 0, 255, CV_THRESH_BINARY | CV_THRESH_OTSU);
 		cv::Canny(img, img, 0.5*otsu_thresh, otsu_thresh);
-	}else if(canny_type_ == MEDIAN) {
+	}else if(config.canny_threshold == MEDIAN) {
 		// Use +- 33% of the median of pixels for threshold values
 		
 		// Compute histogram of image
@@ -584,13 +612,13 @@ void LaneDetector::detectLanes(cv::Mat &img, const std_msgs::Header &header) {
 		}
 		
 		cv::Canny(img, img, 0.66*median, 1.33*median);
-	}else if(canny_type_ == MEAN) {
+	}else if(config.canny_threshold == MEAN) {
 		// Use +- 33% of the mean of all pixels for threshold values
 		cv::Scalar temp_mean = cv::mean(img);
 		float mean = temp_mean.val[0];
 		cv::Canny(img, img, 0.66*mean, 1.33*mean);
-	}else if(canny_type_ == MANUAL) {
-		cv::Canny(img, img, canny_lower_, canny_upper_);
+	}else if(config.canny_threshold == MANUAL) {
+		cv::Canny(img, img, config.canny_lower, config.canny_upper);
 	}
 	
 	// Publish the edges image (if requested)
@@ -644,7 +672,7 @@ void LaneDetector::detectLanes(cv::Mat &img, const std_msgs::Header &header) {
 		
 		// Update the start column
 		const double prev_mid_pt = (left_n + right_n)/2.0;
-		start_col = lane_centre_alpha_*start_col + (1 - lane_centre_alpha_)*prev_mid_pt;
+		start_col = config.lane_centre_alpha*start_col + (1 - config.lane_centre_alpha)*prev_mid_pt;
 		centre_pixels[index] = cv::Point(start_col, *row_it);
 	}
 	
@@ -828,6 +856,8 @@ void LaneDetector::imageDebugging(cv::Mat &img, const std_msgs::Header &header) 
 * transform and camera height. World X and Y is relative to camera origin.
 */
 cv::Point2f LaneDetector::convertPixelToWorld(const cv::Point2f &pixel) {
+	boost::mutex::scoped_lock lock(transform_mutex_);
+	
 	// Form pixel coordinate
 	const cv::Mat p_p = (cv::Mat_<double>(3, 1) << pixel.x + cam_x_offset_, pixel.y + cam_y_offset_, 1.0);
 	
@@ -851,6 +881,8 @@ cv::Point2f LaneDetector::convertPixelToWorld(const cv::Point2f &pixel) {
 * transform and camera height. World X and Y is relative to camera origin.
 */
 cv::Point2f LaneDetector::convertWorldToPixel(const cv::Point2f &p) {
+	boost::mutex::scoped_lock lock(transform_mutex_);
+	
 	// Form world coordinate
 	const cv::Mat p_w = (cv::Mat_<double>(3, 1) << p.x, p.y, 0.0);
 	
