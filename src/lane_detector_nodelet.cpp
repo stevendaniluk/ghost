@@ -99,8 +99,6 @@ class LaneDetector : public nodelet::Nodelet {
 	std::string detect_frame_id_;             // Name of the frame to attach to the lane points message
 	std::vector<int> scan_rows_;              // Pixel rows to detect lanes in
 	double detect_dx_;                        // Depth distance between lane detections
-	PointCloudXY pc_msg_;                     // Pointcloud message containing lane points
-	PointCloudXYZ pc_vis_msg_;                // 3D version of pc_msg_ for visualization with RVIZ
 	sensor_msgs::LaserScan laserscan_msg_;    // LaserScan message containing lane points
 	
 	// Miscellaneous
@@ -185,19 +183,8 @@ void LaneDetector::onInit(){
 *
 * Callback for updating parameters with Dynamic Reconfigure
 */
-void LaneDetector::reconfigureCallback(Config &config_in, uint32_t level) {	
-	config_.use_imu = config_in.use_imu;
-	
-	config_.apply_gauss = config_in.apply_gauss;
-	config_.gauss_k_size = config_in.gauss_k_size;
-	config_.gauss_sigma_x = config_in.gauss_sigma_x;
-	config_.gauss_sigma_y = config_in.gauss_sigma_y;
-	
-	config_.canny_threshold = config_in.canny_threshold;
-	config_.canny_lower = config_in.canny_lower;
-	config_.canny_upper = config_in.canny_upper;
-	
-	config_.lane_centre_alpha = config_in.lane_centre_alpha;
+void LaneDetector::reconfigureCallback(Config &config_in, uint32_t level) {
+	config_ = config_in;
 }
 
 /* imuCallback
@@ -527,17 +514,7 @@ bool LaneDetector::initializeDetector() {
 		x += detect_dx_;
 	}
 	
-	// Fill in constant sections of messages
-	pc_msg_.header.frame_id = detect_frame_id_;
-	pc_msg_.width = 2;
-	pc_msg_.height = scan_rows_.size();
-	pc_msg_.points.resize(pc_msg_.width*pc_msg_.height);
-	
-	pc_vis_msg_.header.frame_id = detect_frame_id_;
-	pc_vis_msg_.width = 2;
-	pc_vis_msg_.height = scan_rows_.size();
-	pc_vis_msg_.points.resize(pc_vis_msg_.width*pc_vis_msg_.height);
-	
+	// Fill in constant sections of message
 	const int laserscan_res = 100;
 	laserscan_msg_.header.frame_id = detect_frame_id_;
 	laserscan_msg_.angle_min = -cam_FOV_/2 - 0.1*PI;
@@ -636,98 +613,101 @@ void LaneDetector::detectLanes(cv::Mat &img, const std_msgs::Header &header) {
 	// as a moving average of the detected centreline
 	
 	// Necessary variables
-	int index;                            // Current index in scan_rows_
-	int left_n, right_n;                  // Left and right pixel hits in the current row
-	std::vector<cv::Point> left_pixels(scan_rows_.size(), cv::Point(0, 0));   // For storing left lane pixels
-	std::vector<cv::Point> right_pixels(scan_rows_.size(), cv::Point(0, 0));  // For storing right lane pixels
+	std::vector<cv::Point> hit_pixels;  // Pixels with detected edge on row
+	std::vector<cv::Point2f> hit_world; // World coordinates of hit_pixels
 	std::vector<cv::Point> centre_pixels(scan_rows_.size(), cv::Point(0, 0)); // For storing centreline pixels
-	std::vector<cv::Point2f> left_world(scan_rows_.size(), cv::Point(0, 0));  // For storing left lane world coords
-	std::vector<cv::Point2f> right_world(scan_rows_.size(), cv::Point(0, 0)); // For storing lerightft lane world coords
 	
 	double start_col = (cam_w_ - 1)/2;    // Initialize which column to start from
 	
+	int index;
 	std::vector<int>::iterator row_it;
 	for(index = 0, row_it = scan_rows_.begin(); row_it < scan_rows_.end(); ++row_it, index++) {
 		const unsigned char* row = img.ptr<unsigned char>(*row_it);
+		int left_first = -1;   // First hit scanning left
+		int right_first = -1;  // First hit scanning right
 		
 		// Iterate left for lane hits
-		for(left_n = start_col - 1; left_n >= 0; left_n--) {
-			if(row[left_n] == 255) {
+		for(int col = start_col - 1; col >= 0; col--) {
+			if(row[col] == 255) {
+				const cv::Point pixel = cv::Point(col, *row_it);
+				const cv::Point2f world = convertPixelToWorld(pixel);
+				if(fabs(world.y) > 0.5*config.max_width)
+					break;
+				
+				if(right_first == -1)
+					right_first = col;
+				
 				// Save pixel and world values
-				left_pixels[index] = cv::Point(left_n, *row_it);
-				left_world[index] = convertPixelToWorld(left_pixels[index]);
-				break;
+				hit_pixels.push_back(pixel);
+				hit_world.push_back(world);
+				if(!config.scan_whole_row)
+					break;
 			}
 		}
 		
 		// Iterate right for lane hits
-		for(right_n = start_col + 1; right_n < cam_w_; right_n++) {
-			if(row[right_n] == 255) {
+		for(int col = start_col + 1; col < cam_w_; col++) {
+			if(row[col] == 255) {
+				const cv::Point pixel = cv::Point(col, *row_it);
+				const cv::Point2f world = convertPixelToWorld(pixel);
+				if(fabs(world.y) > 0.5*config.max_width)
+					break;
+				
+				if(right_first == -1)
+					right_first = col;
+				
 				// Save pixel and world values
-				right_pixels[index] = cv::Point(right_n, *row_it);
-				right_world[index] = convertPixelToWorld(right_pixels[index]);
-				break;
+				hit_pixels.push_back(pixel);
+				hit_world.push_back(world);
+				if(!config.scan_whole_row)
+					break;
 			}
 		}
 		
 		// Update the start column
-		const double prev_mid_pt = (left_n + right_n)/2.0;
+		const double prev_mid_pt = (left_first + right_first)/2.0;
 		start_col = config.lane_centre_alpha*start_col + (1 - config.lane_centre_alpha)*prev_mid_pt;
 		centre_pixels[index] = cv::Point(start_col, *row_it);
 	}
 	
 	// Publish the 2D pointcloud (if requested)
 	if(pc_requested) {
-		// Need to convert to XY pointcloud
-		for(index = 0; index < scan_rows_.size(); index++) {
-			// Convert left lane points
-			if(left_world[index].x != 0.0 && left_world[index].y != 0.0) {
-				pc_msg_.points[pc_msg_.width*index].x = left_world[index].x;
-				pc_msg_.points[pc_msg_.width*index].y = left_world[index].y;
-			}else {
-				pc_msg_.points[pc_msg_.width*index].x = std::numeric_limits<double>::infinity();
-				pc_msg_.points[pc_msg_.width*index].y = std::numeric_limits<double>::infinity();
-			}
-			
-			// Convert right lane points
-			if(right_world[index].x != 0.0 && right_world[index].y != 0.0) {
-				pc_msg_.points[pc_msg_.width*index + 1].x = right_world[index].x;
-				pc_msg_.points[pc_msg_.width*index + 1].y = right_world[index].y;
-			}else {
-				pc_msg_.points[pc_msg_.width*index + 1].x = std::numeric_limits<double>::infinity();
-				pc_msg_.points[pc_msg_.width*index + 1].y = std::numeric_limits<double>::infinity();
-			}
+		PointCloudXY::Ptr pc_msg (new PointCloudXY);
+		pc_msg->header.frame_id = detect_frame_id_;
+		pcl_conversions::toPCL(header.stamp, pc_msg->header.stamp);
+		pc_msg->width = 1;
+		pc_msg->height = hit_world.size();
+		pc_msg->points.resize(pc_msg->width*pc_msg->height);
+		
+		// Fill in XY pointcloud
+		int index;
+		std::vector<cv::Point2f>::iterator iter;
+		for(index = 0, iter = hit_world.begin(); iter < hit_world.end(); ++iter, index++) {
+			pc_msg->points[index].x = iter->x;
+			pc_msg->points[index].y = iter->y;
 		}
 		
-		pcl_conversions::toPCL(header.stamp, pc_msg_.header.stamp);
-		pub_pc_.publish(pc_msg_);
+		pub_pc_.publish(pc_msg);
 	}
 	
-	// Publish the pointcloud for visualization (if requested)
+	// Publish the XYZ pointcloud for visualization (if requested)
 	if(pc_vis_requested) {
-		// Need to convert to XYZ pointcloud for RVIZ
-		for(index = 0; index < scan_rows_.size(); index++) {
-			// Convert left lane points
-			if(left_world[index].x != 0.0 && left_world[index].y != 0.0) {
-				pc_vis_msg_.points[pc_vis_msg_.width*index].x = left_world[index].x;
-				pc_vis_msg_.points[pc_vis_msg_.width*index].y = left_world[index].y;
-			}else {
-				pc_vis_msg_.points[pc_vis_msg_.width*index].x = std::numeric_limits<double>::infinity();
-				pc_vis_msg_.points[pc_vis_msg_.width*index].y = std::numeric_limits<double>::infinity();
-			}
-			
-			// Convert right lane points
-			if(right_world[index].x != 0.0 && right_world[index].y != 0.0) {
-				pc_vis_msg_.points[pc_vis_msg_.width*index + 1].x = right_world[index].x;
-				pc_vis_msg_.points[pc_vis_msg_.width*index + 1].y = right_world[index].y;
-			}else {
-				pc_vis_msg_.points[pc_vis_msg_.width*index + 1].x = std::numeric_limits<double>::infinity();
-				pc_vis_msg_.points[pc_vis_msg_.width*index + 1].y = std::numeric_limits<double>::infinity();
-			}
+		PointCloudXYZ::Ptr pc_vis_msg (new PointCloudXYZ);
+		pc_vis_msg->header.frame_id = detect_frame_id_;
+		pcl_conversions::toPCL(header.stamp, pc_vis_msg->header.stamp);
+		pc_vis_msg->width = 1;
+		pc_vis_msg->height = hit_world.size();
+		pc_vis_msg->points.resize(pc_vis_msg->width*pc_vis_msg->height);
+		
+		// Fill in XYZ pointcloud
+		int index;
+		std::vector<cv::Point2f>::iterator iter;
+		for(index = 0, iter = hit_world.begin(); iter < hit_world.end(); ++iter, index++) {
+			pc_vis_msg->points[index].x = iter->x;
+			pc_vis_msg->points[index].y = iter->y;
 		}
 		
-		pcl_conversions::toPCL(header.stamp, pc_vis_msg_.header.stamp);
-		pub_pc_vis_.publish(pc_vis_msg_);
+		pub_pc_vis_.publish(pc_vis_msg);
 	}
 	
 	// Publish the laserscan points (if requested)
@@ -738,22 +718,12 @@ void LaneDetector::detectLanes(cv::Mat &img, const std_msgs::Header &header) {
 		// Default to infinity
 		std::fill(laserscan_msg_.ranges.begin(), laserscan_msg_.ranges.end(), std::numeric_limits<double>::infinity());
 		
-		// Convert right lane points
-		for(index = 0; index < scan_rows_.size(); index++) {
-			if(right_world[index].x != 0.0 && right_world[index].y != 0.0) {
-				const double angle = atan2(right_world[index].y, right_world[index].x);
-				const int ray_index = round((angle - laserscan_msg_.angle_min)/laserscan_msg_.angle_increment);
-				laserscan_msg_.ranges[ray_index] = sqrt(pow(right_world[index].x, 2) + pow(right_world[index].y, 2));
-			}
-		}
-		
-		// Convert left lane points
-		for(index = 0; index < scan_rows_.size(); index++) {
-			if(left_world[index].x != 0.0 && left_world[index].y != 0.0) {
-				const double angle = atan2(left_world[index].y, left_world[index].x);
-				const int ray_index = round((angle - laserscan_msg_.angle_min)/laserscan_msg_.angle_increment);
-				laserscan_msg_.ranges[ray_index] = sqrt(pow(left_world[index].x, 2) + pow(left_world[index].y, 2));
-			}
+		// Fill in scan points
+		std::vector<cv::Point2f>::iterator iter;
+		for(iter = hit_world.begin(); iter < hit_world.end(); ++iter) {
+			const double angle = atan2(iter->y, iter->x);
+			const int ray_index = round((angle - laserscan_msg_.angle_min)/laserscan_msg_.angle_increment);
+			laserscan_msg_.ranges[ray_index] = sqrt(pow(iter->x, 2) + pow(iter->y, 2));
 		}
 		
 		laserscan_msg_.header.stamp = header.stamp;
@@ -766,15 +736,8 @@ void LaneDetector::detectLanes(cv::Mat &img, const std_msgs::Header &header) {
 		
 		// Draw circles for all the points
 		std::vector<cv::Point>::iterator point_it;
-		for(point_it = left_pixels.begin() ; point_it < left_pixels.end(); ++point_it) {
-			if(point_it->x != 0 && point_it->y != 0) {
-				cv::circle(pts_img, *point_it, 1, 255);
-			}
-		}
-		for(point_it = right_pixels.begin() ; point_it < right_pixels.end(); ++point_it) {
-			if(point_it->x != 0 && point_it->y != 0) {
-				cv::circle(pts_img, *point_it, 1, 255);
-			}
+		for(point_it = hit_pixels.begin() ; point_it < hit_pixels.end(); ++point_it) {
+			cv::circle(pts_img, *point_it, 1, 255);
 		}
 		for(point_it = centre_pixels.begin() ; point_it < centre_pixels.end(); ++point_it) {
 			cv::circle(pts_img, *point_it, 5, 255, -1);
@@ -793,7 +756,7 @@ void LaneDetector::detectLanes(cv::Mat &img, const std_msgs::Header &header) {
 *
 * Currently performs:
 *   -Birds eye view projection
-*   -Histogram of pixel itnensities
+*   -Histogram of pixel intensities
 *   -Otsu threshold
 */
 void LaneDetector::imageDebugging(cv::Mat &img, const std_msgs::Header &header) {	
