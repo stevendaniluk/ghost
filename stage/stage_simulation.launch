@@ -1,0 +1,51 @@
+<!-- Simple Stage simulation for testing -->
+
+<launch>
+  
+  <arg name="world_name"     default="example_track.world"/>
+  <param name="/use_sim_time" value="true"/>
+  
+  <!-- Robot Model -->
+  <include file="$(find ghost)/launch/state_publisher.launch" />
+  
+  <!-- Load the car parameters -->
+  <rosparam
+      file="$(find ghost)/param/car_params.yaml"
+      command="load"
+  />
+  
+  <!-- Node for converting from cmd_car to twist messages -->
+  <node
+    pkg="ghost"
+    type="cmd_car_to_twist"
+    name="cmd_car_to_twist"
+  />
+  
+  <!--  ******************** Stage ********************  -->
+  <!-- 
+        Publishes transforms:
+          /base_link -> /base_laser
+          /base_footprint -> /base_link (identity)
+          /odom -> base_footprint
+        Publishes topics:
+          /odom : odometry data from the simulated odometry
+          /base_scan : laser data from the simulated laser
+          /base_pose_ground_truth : the ground truth pose
+        Parameters:
+          base_watchdog_timeout: time after receiving the last cmd_vel before stopping
+        Args:
+          -g : run in headless mode.
+  --> 
+  <node 
+    pkg="stage_ros" 
+    type="stageros" 
+    name="stageros"
+    args="$(find ghost)/stage/$(arg world_name)">
+      <param name="base_watchdog_timeout" value="0.5"/>
+      <remap from="odom" to="odometry/filtered"/>
+      <remap from="base_pose_ground_truth" to="track_pose"/>
+      <remap from="cmd_vel" to="cmd_car_twist"/>
+      <remap from="base_scan" to="lane_detector/lane_scan"/>
+  </node>
+  
+</launch>
