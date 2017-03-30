@@ -9,24 +9,29 @@ Includes:
 
 <launch>
   
+  <!-- Run onboard, or locally -->
+  <arg name="onboard"  default="true" />
+  <include file="$(find ghost)/launch/hardware.machine">
+    <arg name="run_onboard" value="$(arg onboard)"/>
+  </include>
+    
   <!-- Load the car parameters -->
-  <rosparam 
+  <rosparam
       file="$(find ghost)/param/car_params.yaml"
       command="load" 
   />
   
   <!-- Load URDF file -->
-  <include file="$(find ghost)/launch/includes/state_publisher.launch.xml" />
+  <include file="$(find ghost)/launch/state_publisher.launch" />
   
   <!-- Start rosserial
-     
     Board specific serial ports:
         Android Uno:  /dev/ttyACM0
         Android Nano: /dev/ttyUSB0
     Possible baud rates:
         9600, 14400, 19200, 28800, 38400, 57600, or 115200
   -->
-  <node 
+  <node
     pkg="rosserial_server" 
     type="serial_node" 
     name="rosserial_server" >
@@ -38,12 +43,13 @@ Includes:
         subscribers: []
     </rosparam>
   </node>
+  
   <node
     pkg="rosserial_python"
     type="message_info_service.py"
     name="rosserial_message_info"
   />
-  
+      
   <!-- Node for estimating odometry by integrating velocity -->
   <node
     pkg="ghost"

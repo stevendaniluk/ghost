@@ -6,18 +6,28 @@ Includes:
   -Arduino
   -Odometry integration
   -IMU
-  -EKF for odometry estimation
+  -Camera
+  -Lane detection
 -->
 
 <launch>
   
+  <!-- Run onboard, or locally -->
+  <arg name="onboard"  default="true" />
+  
   <!-- Core car nodes -->
-  <include file="$(find ghost)/launch/car_minimal.launch" />
+  <include file="$(find ghost)/launch/car_minimal.launch" >
+    <arg name="onboard" value="$(arg onboard)"/>
+  </include>
   
   <!-- IMU node -->
-  <include file="$(find ghost)/launch/imu.launch" />
+  <include file="$(find ghost)/launch/imu.launch" >
+    <arg name="onboard" value="$(arg onboard)"/>
+  </include>
   
   <!-- EKF -->
-  <include file="$(find ghost)/launch/includes/robot_localization.launch.xml" />
+  <include file="$(find ghost)/launch/ekf.launch" >
+    <arg name="onboard" value="$(arg onboard)"/>
+  </include>
   
 </launch>

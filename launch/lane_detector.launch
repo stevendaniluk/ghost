@@ -7,7 +7,6 @@ Includes:
 -->
 <launch>
   
-  <!-- Set the names of the camera and nodelet manager-->
   <arg name="camera_name"  value="camera" />
   <arg name="manager"      value="camera_nodelet_manager" />
   
@@ -16,10 +15,7 @@ Includes:
     <arg name="manager"      value="$(arg manager)" />
     <arg name="camera_name"  value="$(arg camera_name)" />
   </include>
-  
-  <!-- Parameters -->
-  <rosparam file="$(find ghost)/param/lane_detector_params.yaml" command="load"/>
-  
+    
   <!-- Lane Detector -->
   <node 
     pkg="nodelet" 
@@ -27,7 +23,28 @@ Includes:
     name="lane_detector" 
     args="load ghost/LaneDetector $(arg camera_name)/$(arg manager)" 
     output="screen">
-    <!--<remap from="image_rect_mono" to="something/else"/>-->
+    <remap from="/$(arg camera_name)/image_rect_mono" to="$(arg camera_name)/cropped/image_rect_mono"/>
+    
+    <!-- General detection parameters -->
+    <param name="debug" value="false" />
+    <param name="min_range" value="0.30" />
+    <param name="max_range" value="4.0" />
+    <param name="detect_dx" value="0.10" />
+    <param name="detect_frame_id" value="camera_ground" />
+    <param name="imu_topic" value="/imu/data" />
+    <param name="use_imu" value="false" />
+    <param name="bev_ppm" value="200" />
+    
+    <!-- Image filtering parameters-->
+    <param name="apply_gauss" value="true" />
+    <param name="gauss_k_size" value="5" />
+    <param name="gauss_sigma_x" value="0.8" />
+    <param name="gauss_sigma_y" value="0.4" />
+    <param name="canny_threshold" value="0" />
+    <param name="canny_lower" value="120" />
+    <param name="canny_upper" value="150" />
+    <param name="scan_whole_row" value="false" />
+    <param name="lane_centre_alpha" value="0.95" />
   </node>
 
 </launch>

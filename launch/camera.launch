@@ -3,8 +3,8 @@
 Includes:
   -Nodelet manager
   -Camera
-  -Debayer
   -Rectification
+  -Cropping
 -->
 <launch>
   
@@ -12,53 +12,78 @@ Includes:
   <arg name="manager"        default="camera_nodelet_manager" />
   <arg name="camera_serial"  default="16455904" />
   <arg name="calibrated"     default="true" />
-
+  
   <group ns="$(arg camera_name)">
     
     <!-- Nodelet manager for the camera-->
-    <node 
-      pkg="nodelet" 
-      type="nodelet" 
-      name="$(arg manager)" 
+    <node
+      pkg="nodelet"
+      type="nodelet"
+      name="$(arg manager)"
       args="manager" 
       output="screen"
     />
     
     <!--- Pointgrey Camera -->
-    <node 
-      pkg="nodelet" 
-      type="nodelet" 
+    <node
+      pkg="nodelet"
+      type="nodelet"
       name="camera_nodelet"
+      output="screen"
       args="load pointgrey_camera_driver/PointGreyCameraNodelet $(arg manager)">
       <param name="camera_info_url" if="$(arg calibrated)"
              value="file://$(env HOME)/.ros/camera_info/$(arg camera_serial).yaml" />
       <param name="frame_id" value="camera" />
       <param name="serial" value="$(arg camera_serial)" />
-      <param name="frame_rate" value="25" />
+      <param name="format7_color_coding" value="mono8" />
       
-      <!-- Full resolution: 808x608 -->
-      <param name="format7_roi_height" value="450" />
-      <param name="format7_roi_width" value="808" />
-      <param name="format7_x_offset" value="0" />
-      <param name="format7_y_offset" value="158" />
-    </node>
-    
-    <!-- Debayer -->
-    <node 
-      pkg="nodelet" 
-      type="nodelet"
-      name="image_proc_debayer"
-      args="load image_proc/debayer $(arg manager)">
-      <!-- <remap from="image_mono" to="something/else"/> -->
+      <!-- Indoors -->
+      <param name="frame_rate" value="30" />
+      <param name="auto_exposure" value="true" />
+      <param name="exposure" value="1.35" />
+      <param name="auto_shutter" value="true" />
+      <param name="shutter_speed" value="0.033" />
+      <param name="auto_gain" value="true" />
+      <param name="gain" value="25.0" />
+      
+      <!-- Outdoors (low light) -->
+      <!--
+      <param name="frame_rate" value="30" />
+      <param name="auto_exposure" value="false" />
+      <param name="exposure" value="-4.2" />
+      <param name="auto_shutter" value="false" />
+      <param name="shutter_speed" value="0.001" />
+      <param name="auto_gain" value="false" />
+      <param name="gain" value="4.30" />
+      -->
+      
     </node>
     
     <!-- Rectification -->
-    <node 
+    <node
       pkg="nodelet" 
       type="nodelet" 
-      name="image_proc_rectify" 
+      name="image_proc_rectify"
+      output="screen"
       args="load image_proc/rectify $(arg manager)">
-      <remap from="image_rect" to="image_rect_mono" />
+      <remap from="image_mono" to="image_raw" />
+      <remap from="image_rect" to="image_rect_mono_uncropped" />
+    </node>
+    
+    <!-- Cropping -->
+    <node
+      pkg="nodelet"
+      type="nodelet"
+      name="image_proc_crop_decimate"
+      args="load image_proc/crop_decimate $(arg manager)">
+      <remap from="camera/image_raw" to="/$(arg camera_name)/image_rect_mono_uncropped" />
+      <remap from="camera_out/image_raw" to="/$(arg camera_name)/cropped/image_rect_mono" />
+      
+      <!-- Full resolution: 808x608 -->
+      <param name="x_offset" value="5" />
+      <param name="y_offset" value="158" />
+      <param name="width" value="798" />
+      <param name="height" value="350" />
     </node>
     
   </group>
