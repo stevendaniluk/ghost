@@ -32,6 +32,7 @@ generate_messages(
 
 ## Declare dynamic reconfigure parameters
 generate_dynamic_reconfigure_options(
+  cfg/Controller.cfg
   cfg/LaneDetector.cfg
 )
 
@@ -85,3 +86,12 @@ target_link_libraries(lane_detector_nodelet ${catkin_LIBRARIES})
 add_executable(lane_detector_node src/lane_detector_node.cpp)
 add_dependencies(lane_detector_node ${PROJECT_NAME}_gencfg)
 target_link_libraries(lane_detector_node ${catkin_LIBRARIES})
+
+# Controller executable
+add_executable(controller src/controller.cpp)
+add_dependencies(controller ${PROJECT_NAME}_gencfg)
+target_link_libraries(controller ${catkin_LIBRARIES})
+
+# CarCommand to twist message converter executable
+add_executable(cmd_car_to_twist src/cmd_car_to_twist.cpp)
+target_link_libraries(cmd_car_to_twist ${catkin_LIBRARIES})
