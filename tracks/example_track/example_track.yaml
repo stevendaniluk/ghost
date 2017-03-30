@@ -1,0 +1,10 @@
+image: example_track.jpg
+resolution: 0.01282051  # meters/pixel
+origin: [-11.39102, -8.05128, 0.0]  # Lower left pixel in world frame [x, y, yaw]
+occupied_thresh: 0.65  # Pixel occupied when probability greater than this
+free_thresh: 0.196  # Pixel free when probability less than this
+negate: 0  # Reverse white/black semantics
+
+# Image size: 1777x1256
+# Image pixels per cm: 60
+# Drawing scale: 0.013

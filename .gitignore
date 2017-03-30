@@ -3,3 +3,7 @@
 
 # Jetbrains files
 .idea/*
+
+# Track files
+tracks/*
+!tracks/example_track*
