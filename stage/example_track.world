@@ -20,7 +20,7 @@ interval_sim 100  # simulation timestep in milliseconds
 
 window (
   size [600.0 400.0]
-  center [0.0 0.0]
+  center [2.6731 3.7823]
   rotate [0.0 0.0]
   scale 20
 )
@@ -29,13 +29,14 @@ floorplan (
   name "example_track"
   bitmap "../tracks/example_track/example_track.jpg"
   size [22.782 16.103 2.0]
-  #pose [-11.39102 -8.05128 0.0 0.0]
-  pose [0.0 0.0 0.0 0.0]
+  
+  # pose = (0.5*size - yaml_origin)
+  pose [2.6731 3.7823 0.0 0.0]
 )
 
 # throw in a robot
 car (
-  pose [1.0 -3.8 0.0 180.0]
+  pose [0.0 0.0 0.0 180.0]
   name "car"
   color "black"
 )

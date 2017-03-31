@@ -361,11 +361,10 @@ if __name__ == '__main__':
 			# Draw line on image (make a little bigger so it shows up)
 			rline_img[(rline_pt[1] - 1):(rline_pt[1] + 2), (rline_pt[0] - 1):(rline_pt[0] + 2)] = 0
 		
-	# Make all racing line points relative to centre of image
+	# Make all racing line points relative to centre of the start/finish line
 	# (have to negate the y-direction since image and world Y is reversed)
-	h = img.shape[0]
-	w = img.shape[1]
-	rline -= np.array([int(w/2), int(h/2)])
+	origin_pixel = (start_l + start_r)/2
+	rline -= np.array([int(origin_pixel[0]), int(origin_pixel[1])])
 	rline[:, 1] *= -1
 	
 	# Scale racing line to world units [meters]
@@ -384,9 +383,9 @@ if __name__ == '__main__':
 	
 	print("The identified racing line and starting line is shown in the figure.")
 	print("The world coordinates (in meters) of each point in the racing line have been saved to %s, " \
-		"with the x and y coordinates in the first and second columns, respectively.\n" % (textfile_name))
+		"with the x and y coordinates in the first and second columns, respectively.\n" % (textfile_name))	
 	print("Please set the origin value in the track yaml file to: ")
-	print("[%.5f, %.5f, 0.0]\n" % (-img_res*w/2, -img_res*h/2))
+	print("[%.5f, %.5f, 0.0]\n" % (-img_res*origin_pixel[0], -img_res*(img.shape[0] - origin_pixel[1])))
 	
 	# Show the identified line
 	if resize_factor < 1:
