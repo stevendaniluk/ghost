@@ -1,25 +1,27 @@
 <!-- Ghost Machine Definition -->
 
 <launch>
-  
-  <arg name="run_onboard"  default="true"/>
-  
-  <group if="$(arg run_onboard)">
-    <machine 
-      name="NUC"
-      address="192.168.91.1"
-      user="steven_nuc"
-      env-loader="/home/steven_nuc/ros_ws/devel/env.sh"
-      default="true"
-    />
-  </group>
-  
-  <group unless="$(arg run_onboard)">
-    <machine
-      name="local"
-      address="localhost"
-      default="true"
-    />
-  </group>
+    <arg name="remote"      default="$(env REMOTE_LAUNCH)"/>
+    <arg name="hostname"    default="$(env REMOTE_LAUNCH_HOSTNAME)"/>
+
+    <!-- Start everything on the onboard computer -->
+    <group if="$(arg remote)">
+        <machine
+            name="onbaord"
+            address="192.168.0.1"
+            user="steven_nuc"
+            env-loader="/home/steven_nuc/ros_ws/devel/env.sh"
+            default="true"
+        />
+    </group>
+
+    <!-- Start everyone on the local machine -->
+    <group unless="$(arg remote)">
+        <machine
+            name="local"
+            address="localhost"
+            default="true"
+        />
+    </group>
 
 </launch>

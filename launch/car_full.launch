@@ -11,23 +11,14 @@ Includes:
 -->
 
 <launch>
-  
-  <!-- Run onboard, or locally -->
-  <arg name="onboard"  default="true" />
-  
+
   <!-- Core car nodes -->
-  <include file="$(find ghost)/launch/car_minimal.launch" >
-    <arg name="onboard" value="$(arg onboard)"/>
-  </include>
-  
+  <include file="$(find ghost)/launch/car_minimal.launch" />
+
   <!-- IMU node -->
-  <include file="$(find ghost)/launch/imu.launch" >
-    <arg name="onboard" value="$(arg onboard)"/>
-  </include>
-  
+  <include file="$(find ghost)/launch/imu.launch" />
+
   <!-- EKF -->
-  <include file="$(find ghost)/launch/ekf.launch" >
-    <arg name="onboard" value="$(arg onboard)"/>
-  </include>
-  
+  <include file="$(find ghost)/launch/ekf.launch" />
+
 </launch>

@@ -1,19 +1,14 @@
 <!-- Launcher robot_localization package -->
 
 <launch>
-	
-	<!-- Run onboard, or locally -->
-  <arg name="onboard"  default="true" />
-  <include file="$(find ghost)/launch/hardware.machine">
-    <arg name="run_onboard" value="$(arg onboard)"/>
-  </include>
-  
+
   <!-- EKF -->
-  <node 
-    pkg="robot_localization" 
-    type="ekf_localization_node" 
-    name="ekf" 
+  <node
+    pkg="robot_localization"
+    type="ekf_localization_node"
+    name="ekf"
     clear_params="true">
     <rosparam command="load" file="$(find ghost)/param/ekf_params.yaml"/>
   </node>
+
 </launch>

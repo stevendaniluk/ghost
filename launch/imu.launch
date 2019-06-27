@@ -1,36 +1,29 @@
 <!-- Phidgets IMU launch file -->
 
 <launch>
-		
-	<!-- Run onboard, or locally -->
-  <arg name="onboard"  default="true" />
-  <include file="$(find ghost)/launch/hardware.machine">
-    <arg name="run_onboard" value="$(arg onboard)"/>
-  </include>
-	
 	<!-- Nodelet manager -->
-	<node 
-		pkg="nodelet" 
-		type="nodelet" 
-		name="imu_manager" 
-		args="manager" 
+	<node
+		pkg="nodelet"
+		type="nodelet"
+		name="imu_nodelet_manager"
+		args="manager"
 	/>
 
 	<!-- IMU Driver -->
-	<node 
-		pkg="nodelet" 
-		type="nodelet" 
-		name="PhidgetsImuNodelet" 
-		args="load phidgets_imu/PhidgetsImuNodelet imu_manager">
-		
+	<node
+		pkg="nodelet"
+		type="nodelet"
+		name="PhidgetsImuNodelet"
+		args="load phidgets_imu/PhidgetsImuNodelet imu_nodelet_manager">
+
 		<param name="frame_id" value="imu"/>
 		<param name="period" value="16"/>  <!-- rates: 4 8 16 24 32 ... 1000 [ms] -->
 		<param name="angular_velocity_stdev" value="0.000349056"/>
 		<param name="linear_acceleration_stdev" value="0.002943"/>
 		<param name="magnetic_field_stdev" value="0.001658"/>
-		
+
 		<!-- Compass correction params -->
-		<!-- 
+		<!--
 		<param name="cc_mag_field" value="0.52859"/>
 		<param name="cc_offset0" value="0.03921"/>
 		<param name="cc_offset1" value="0.19441"/>
@@ -47,11 +40,11 @@
 	</node>
 
 	<!-- IMU Orientation Filter -->
-	<node 
-		pkg="nodelet" 
-		type="nodelet" 
-		name="ImuFilterNodelet" 
-		args="load imu_filter_madgwick/ImuFilterNodelet imu_manager" >
+	<node
+		pkg="nodelet"
+		type="nodelet"
+		name="ImuFilterNodelet"
+		args="load imu_filter_madgwick/ImuFilterNodelet imu_nodelet_manager" >
 
 		<param name="world_frame" value="enu"/>
 		<param name="use_mag" value="false"/>

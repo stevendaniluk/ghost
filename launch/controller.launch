@@ -1,39 +1,33 @@
 <!-- Controller for steering and throttle-->
 
 <launch>
-  
-  <!-- Run onboard, or locally -->
-  <arg name="onboard"  default="true" />
-  <include file="$(find ghost)/launch/hardware.machine">
-    <arg name="run_onboard" value="$(arg onboard)"/>
-  </include>
-	
+
   <node
     pkg="ghost"
     type="controller"
     name="controller"
     output="screen" >
-    
+
     <param name="debug" value="false" />
     <param name="CW" value="true" />
     <param name="track" value="example_track/example_track_centreline.txt" />
-    
+
     <!-- Car limits -->
     <param name="v_limit"           value="3.0" />
     <param name="ax_accel_limit"    value="2.0" />
     <param name="ax_braking_limit"  value="0.5" />
     <param name="ay_limit"          value="1.5" />
-    
+
     <!-- Steering PID controller parameters -->
     <param name="lookahead_dist"    value="1.0" />
     <param name="K_psi"             value="0.3" />
     <param name="Ti_psi"            value="6.0" />
     <param name="Td_psi"            value="0.0" />
-    
+
     <!-- Velocity PID controller parameters -->
     <param name="K_v"               value="1.0" />
     <param name="Ti_v"              value="10.0" />
     <param name="Td_v"              value="0.0" />
   </node>
-  
+
 </launch>
