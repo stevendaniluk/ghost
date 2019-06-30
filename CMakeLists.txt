@@ -60,8 +60,8 @@ rosserial_configure_client(
   DIRECTORY arduino
   TOOLCHAIN_FILE ${ROSSERIAL_ARDUINO_TOOLCHAIN}
 )
-rosserial_add_client_target(arduino onboard_arduino)
-rosserial_add_client_target(arduino onboard_arduino-upload)
+rosserial_add_client_target(arduino car_interface)
+rosserial_add_client_target(arduino car_interface-upload)
 
 # Keyboard teleop executable
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)

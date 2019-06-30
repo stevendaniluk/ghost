@@ -1,6 +1,6 @@
 /* Interface for controlling the car
 
-Monitors the cmd_car topic for commands from the controller, as well as 
+Monitors the cmd_car topic for commands from the controller, as well as
 monitoring inputs from the transmitter. When override is active, the 
 transmitter commands are issued to the steering servo and ESC, and when
 override is inactive, the controller commands are issued.
@@ -15,7 +15,7 @@ contain the remote commands.
 
 Wheel encoder signals are also monitored to count pulses.
 
-The arduino_state topic is published, which contains the commands executed 
+The arduino_state topic is published, which contains the commands executed
 on the servo and esc, an override flag, and the encoder pulses.
 */
 
@@ -148,10 +148,10 @@ ros::Publisher state_pub("arduino_state", &state_msg);
 void setup(){
 	nh.getHardware()->setBaud(115200);
 	nh.initNode();
-		
+
 	nh.subscribe(cmd_sub);
 	nh.advertise(state_pub);
-	
+
 	// Wait for connection
 	while(!nh.connected()) {nh.spinOnce();}
 
@@ -160,21 +160,21 @@ void setup(){
 	throttle_cmd = throttle_centre;
 	steering_override_pwm_shared = steering_cmd;
 	throttle_override_pwm_shared = throttle_cmd;
-	
+
 	// Setup the servos
 	steering.attach(STEERING_OUT_PIN);
 	throttle.attach(THROTTLE_OUT_PIN);
 	delay(10);
 	steering.write(steering_cmd);
 	throttle.write(throttle_cmd);
-	
+
 	// Attach interrupt to read override and encoder signals
 	PCintPort::attachInterrupt(OVERRIDE_PIN, overrideISR, CHANGE);
 	PCintPort::attachInterrupt(FL_ENCODER_PIN, FLEncoderISR, CHANGE);
 	PCintPort::attachInterrupt(FR_ENCODER_PIN, FREncoderISR, CHANGE);
 	PCintPort::attachInterrupt(RL_ENCODER_PIN, RLEncoderISR, CHANGE);
 	PCintPort::attachInterrupt(RR_ENCODER_PIN, RREncoderISR, CHANGE);
-	
+
 	delay(1000);
 }// end setup
 
@@ -188,9 +188,9 @@ void loop() {
 
 	// Check if controller commands are being overidden
 	checkOverride();
-	
+
 	// Fill the message with the controller or the override commands
-	if(override_active) {    
+	if(override_active) {
 		// Make a local copy of inputs
 		noInterrupts();
 		if(steering_flag_shared) {
@@ -202,11 +202,11 @@ void loop() {
 			throttle_flag_shared = false;
 		}
 		interrupts();
-		
+
 		// Map to range [-1,1], and make sure they are within bounds
 		steering_override = -2.0*float(steering_override_pwm_local - min_pwm)/float(max_pwm - min_pwm) + 1.0;
 		steering_override = min(max(steering_override,-1.0), 1.0);
-		
+
 		if(throttle_override_pwm_local >= throttle_centre_pwm){
 			throttle_override = float(throttle_override_pwm_local - throttle_centre_pwm)/float(max_pwm - throttle_centre_pwm);
 		}else{
@@ -245,7 +245,7 @@ void loop() {
 	const unsigned long pub_time = millis();
 	if ((pub_time - prev_pub_time) > delta_pub_millis) {
 		prev_pub_time = pub_time;
-				
+
 		// Get encoder counts
 		noInterrupts();
 		state_msg.FL_pulse_count = FL_encoder_pulses_shared;
@@ -253,13 +253,13 @@ void loop() {
 		state_msg.RL_pulse_count = RL_encoder_pulses_shared;
 		state_msg.RR_pulse_count = RR_encoder_pulses_shared;
 		interrupts();
-						
+
 		// Publish the messages
 		state_msg.override = override_active;
 		state_msg.header.stamp = nh.now();
 		state_pub.publish(&state_msg);
 	}
-	
+
 }// end loop
 
 //--------------------------------------------------
@@ -282,12 +282,12 @@ void checkOverride() {
 		override_flag_shared = false;
 	}
 	interrupts();
-	
-	// Attach/dettach the steering and throttle interrupts 
+
+	// Attach/dettach the steering and throttle interrupts
 	// (don't need them running when override not in use)
 	if (override_active) {
 		// This is the start of an override, attach interrupts
-		PCintPort::attachInterrupt(STEERING_IN_PIN, steeringISR, CHANGE); 
+		PCintPort::attachInterrupt(STEERING_IN_PIN, steeringISR, CHANGE);
 		PCintPort::attachInterrupt(THROTTLE_IN_PIN, throttleISR, CHANGE);
 	}else if (!override_active && prev_override_active) {
 		// This is the end of an override, dettachinterrupts
@@ -299,7 +299,7 @@ void checkOverride() {
 
 // Steering interrupt service routine
 void steeringISR() {
-	if(digitalRead(STEERING_IN_PIN) == HIGH) { 
+	if(digitalRead(STEERING_IN_PIN) == HIGH) {
 		// It's a rising edge of the signal pulse, so record its value
 		steering_start = micros();
 	} else {
@@ -312,11 +312,11 @@ void steeringISR() {
 
 // Throttle interrupt service routine
 void throttleISR() {
-	if(digitalRead(THROTTLE_IN_PIN) == HIGH) { 
+	if(digitalRead(THROTTLE_IN_PIN) == HIGH) {
 		// It's a rising edge of the signal pulse, so record its value
 		throttle_start = micros();
 	} else {
-		// It is a falling edge, so subtract the time of the rising edge to get the pulse duration 
+		// It is a falling edge, so subtract the time of the rising edge to get the pulse duration
 		throttle_override_pwm_shared = (uint16_t)(micros() - throttle_start);
 		// Set the throttle flag to indicate that a new throttle signal has been received
 		throttle_flag_shared = true;
@@ -325,7 +325,7 @@ void throttleISR() {
 
 // Override interrupt service routine
 void overrideISR() {
-	if(digitalRead(OVERRIDE_PIN) == HIGH) { 
+	if(digitalRead(OVERRIDE_PIN) == HIGH) {
 		// It's a rising edge of the signal pulse, so record its value
 		override_start = micros();
 	} else {
