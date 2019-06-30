@@ -33,8 +33,8 @@ on the servo and esc, an override flag, and the encoder pulses.
 #include <ros/time.h>
 #include <std_msgs/UInt32.h>
 #include <ghost/CarControl.h>
-#include <ghost/ArduinoState.h>
-#include <Servo.h> 
+#include <ghost/ControlState.h>
+#include <Servo.h>
 
 // Use PinChangeInt library to detect rising/falling/change on any pin
 // Declare which ports will not be used to save memory
@@ -142,7 +142,7 @@ ros::NodeHandle_<ArduinoHardware, 1, 2, 150, 400> nh;
 ros::Subscriber<ghost::CarControl> cmd_sub("cmd_car", cmdInCallback);
 
 // Setup Publishers
-ghost::ArduinoState state_msg;
+ghost::ControlState state_msg;
 ros::Publisher state_pub("arduino_state", &state_msg);
 
 void setup(){
@@ -213,31 +213,31 @@ void loop() {
 			throttle_override = -float(throttle_centre_pwm - throttle_override_pwm_local)/float(throttle_centre_pwm - min_pwm);
 		}
 		throttle_override = min(max(throttle_override,-1.0), 1.0);
-		
-		state_msg.steering = steering_override;
-		state_msg.throttle = throttle_override;
+
+		state_msg.car_control.steering = steering_override;
+		state_msg.car_control.throttle = throttle_override;
 	}else {
 		// Check controller timeout
 		if((millis() - cmd_receive_time) > cmd_timout) {
 			steering_cmd = 0.0;
 			throttle_cmd = 0.0;
 		}
-		state_msg.steering = steering_cmd;
-		state_msg.throttle = throttle_cmd;
+		state_msg.car_control.steering = steering_cmd;
+		state_msg.car_control.throttle = throttle_cmd;
 	}
-	
+
 	// Write the commands to the servos (must convert to [0,255] range)
 	uint16_t steering_cmd_write, throttle_cmd_write;
-	if(state_msg.steering > 0.0){
-		steering_cmd_write = steering_centre - state_msg.steering*(steering_centre - steering_min);
+	if(state_msg.car_control.steering > 0.0){
+		steering_cmd_write = steering_centre - state_msg.car_control.steering*(steering_centre - steering_min);
 	}else{
-		steering_cmd_write = steering_centre - state_msg.steering*(steering_max - steering_centre);
-	}  
-	if(state_msg.throttle > 0.0){
-		throttle_cmd_write = throttle_centre + state_msg.throttle*(throttle_max - throttle_centre);
+		steering_cmd_write = steering_centre - state_msg.car_control.steering*(steering_max - steering_centre);
+	}
+	if(state_msg.car_control.throttle > 0.0){
+		throttle_cmd_write = throttle_centre + state_msg.car_control.throttle*(throttle_max - throttle_centre);
 	}else{
-		throttle_cmd_write = throttle_centre + state_msg.throttle*(throttle_centre - throttle_min);
-	}  
+		throttle_cmd_write = throttle_centre + state_msg.car_control.throttle*(throttle_centre - throttle_min);
+	}
 	steering.write(steering_cmd_write);
 	throttle.write(throttle_cmd_write);
 

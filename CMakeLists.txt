@@ -22,7 +22,8 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   CarControl.msg
-  ArduinoState.msg
+  CarControlStamped.msg
+  ControlState.msg
 )
 
 generate_messages(

@@ -14,7 +14,7 @@
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
 #include <nav_msgs/Odometry.h>
-#include <ghost/ArduinoState.h>
+#include <ghost/ControlState.h>
 #include <boost/assign.hpp>
 
 #define PI 3.141592653589793
@@ -59,7 +59,7 @@ class Odometry {
 		bool first_message_flag_;                   // Flag for this is the first message received
 		
 		Odometry();
-		void arduinoStateCallback(const ghost::ArduinoState& msg);
+		void ControlStateCallback(const ghost::ControlState& msg);
 		void publishOdom();
 };
 
@@ -117,8 +117,8 @@ Odometry::Odometry() {
 	publish_period_ = ros::Duration(1.0/update_rate);
 	
 	// Subscribe to cmd_car_executed and encoder_pulses messsages
-	arduino_sub_ = nh_.subscribe("arduino_state", 50, &Odometry::arduinoStateCallback, this);
-	
+	arduino_sub_ = nh_.subscribe("arduino_state", 50, &Odometry::ControlStateCallback, this);
+
 	// Setup publisher of odometry message
 	odom_pub_ = nh_.advertise<nav_msgs::Odometry>("odometry/integrated", 50);
 	
@@ -177,12 +177,12 @@ Odometry::Odometry() {
         (0)  (0)  (0)  (0)  (0)  (twist_cov_diag[5]);
 }
 
-void Odometry::arduinoStateCallback(const ghost::ArduinoState& msg) {
+void Odometry::ControlStateCallback(const ghost::ControlState& msg) {
 	update_time_ = msg.header.stamp;
 	
 	// Determine steering angle
-	const double delta = msg.steering*delta_max_;
-	
+	const double delta = msg.car_control.steering*delta_max_;
+
 	// Track pulses from each wheel
 	const int n_FL = msg.FL_pulse_count - FL_prev_pulses_;
 	const int n_FR = msg.FR_pulse_count - FR_prev_pulses_;
