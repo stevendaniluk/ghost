@@ -18,31 +18,8 @@ Includes:
   <!-- Load URDF file -->
   <include file="$(find ghost)/launch/state_publisher.launch" />
 
-  <!-- Start rosserial
-    Board specific serial ports:
-        Android Uno:  /dev/ttyACM0
-        Android Nano: /dev/ttyUSB0
-    Possible baud rates:
-        9600, 14400, 19200, 28800, 38400, 57600, or 115200
-  -->
-  <node
-    pkg="rosserial_server"
-    type="serial_node"
-    name="rosserial_server" >
-    <rosparam>
-      port: /dev/ttyUSB0
-      baud: 115200
-      require:
-        publishers: [arduino_state]
-        subscribers: []
-    </rosparam>
-  </node>
-
-  <node
-    pkg="rosserial_python"
-    type="message_info_service.py"
-    name="rosserial_message_info"
-  />
+  <!-- Start the communication with the car hardware -->
+  <include file="$(find ghost)/launch/car_interface.launch" />
 
   <!-- Node for estimating odometry by integrating velocity -->
   <node

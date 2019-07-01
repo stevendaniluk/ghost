@@ -1,0 +1,24 @@
+<!-- Starts the interface to the car which is a node communicating over serial to the Arduino. -->
+
+<launch>
+
+  <!-- Start rosserial
+    Board specific serial ports:
+        Arduino Uno:  /dev/ttyACM0
+        Arduino Nano: /dev/ttyUSB0
+    Possible baud rates:
+        9600, 14400, 19200, 28800, 38400, 57600, or 115200
+  -->
+
+    <node
+        pkg="rosserial_python"
+        type="serial_node.py"
+        name="car_interface"
+        output="screen" >
+        <rosparam
+            file="$(find ghost)/param/car_interface_params.yaml"
+            command="load"
+        />
+    </node>
+
+</launch>
