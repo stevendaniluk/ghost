@@ -18,6 +18,7 @@ the controller commands (from the incoming topic) are issued.
 #include "Arduino.h"
 #include "interrupt_pwm_signal.h"
 #include "signal_map.h"
+#include "simple_moving_average.h"
 
 // Use PinChangeInt library to detect rising/falling/change on any pin
 // Declare which ports will not be used to save memory
@@ -43,8 +44,8 @@ the controller commands (from the incoming topic) are issued.
 // positions for the servo positions and incoming PWM signals Argument order is: min, center, max.
 const SignalMap steering_servo_map(63, 100, 137);
 const SignalMap throttle_servo_map(58, 87, 132);
-const SignalMap steering_pwm_map(1020, 1475, 1970);
-const SignalMap throttle_pwm_map(1020, 1392, 1970);
+const SignalMap steering_pwm_map(1020, 1485, 1965);
+const SignalMap throttle_pwm_map(1020, 1392, 1965);
 
 // Threshold PWM value for 3rd channel switch to trigger override mode
 const uint16_t override_pwm_thresh = 1500;
@@ -62,6 +63,11 @@ const int16_t cmd_timout = 500;
 // Flags for tracking the override state
 bool override_active = false;
 bool prev_override_active = false;
+
+// Helpers to compute a moving average of the incoming controls from the transmitter, since the
+// signals can be noisy
+SimpleMovingAverage<uint16_t, 5> steering_sma(steering_pwm_map.center);
+SimpleMovingAverage<uint16_t, 5> throttle_sma(throttle_pwm_map.center);
 
 // Arduino servo objects for controlling the steering servo and ESC
 Servo steering;
@@ -156,9 +162,13 @@ void loop() {
         throttle_input.processNewSignals();
         interrupts();
 
+        // Apply the moving average to smooth the signals
+        steering_sma.addDataPoint(steering_input.pwm_local);
+        throttle_sma.addDataPoint(throttle_input.pwm_local);
+
         // Map the pwm inputs to the [-1, 1] range for controls
-        cmd_execute.steering = -steering_pwm_map.mapToUnitOutput(steering_input.pwm_local);
-        cmd_execute.throttle = throttle_pwm_map.mapToUnitOutput(throttle_input.pwm_local);
+        cmd_execute.steering = -steering_pwm_map.mapToUnitOutput(steering_sma.getAverage());
+        cmd_execute.throttle = throttle_pwm_map.mapToUnitOutput(throttle_sma.getAverage());
     } else {
         // Check controller timeout
         if ((millis() - cmd_receive_time) > cmd_timout) {

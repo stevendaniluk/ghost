@@ -7,6 +7,7 @@ generate_arduino_firmware(car_interface
   HDRS interrupt_pwm_signal.h
   HDRS PinChangeInt.h
   HDRS signal_map.h
+  HDRS simple_moving_average.h
   BOARD nano328
   PORT /dev/ttyUSB0
 )
