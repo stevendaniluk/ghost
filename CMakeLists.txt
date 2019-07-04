@@ -83,6 +83,14 @@ rosserial_add_client_target(arduino car_interface-upload)
 ## Build ##
 ###########
 
+# Odometry library
+add_library(car_odometry
+  src/car_odometry.cpp
+)
+target_link_libraries(car_odometry
+  ${catkin_LIBRARIES}
+)
+
 # Keyboard teleop executable
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)
 add_dependencies(teleop_keyboard ${PROJECT_NAME}_generate_messages_cpp)
@@ -121,3 +129,11 @@ target_link_libraries(cmd_car_to_twist ${catkin_LIBRARIES})
 ## Testing ##
 #############
 
+# Unit test for car odometry library
+add_executable(test_car_odometry test/test_car_odometry.cpp)
+gtest_add_tests(test_car_odometry "" test/test_car_odometry.cpp)
+target_link_libraries(test_car_odometry
+    car_odometry
+    ${GTEST_BOTH_LIBRARIES}
+    ${catkin_LIBRARIES}
+)
