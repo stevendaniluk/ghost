@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(ghost)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
@@ -18,7 +20,10 @@ find_package(catkin REQUIRED COMPONENTS
   tf
 )
 
-## Declare custom messages
+################################################
+## Declare ROS messages, services and actions ##
+################################################
+
 add_message_files(
   FILES
   CarControl.msg
@@ -31,13 +36,19 @@ generate_messages(
   std_msgs
 )
 
-## Declare dynamic reconfigure parameters
+################################################
+## Declare ROS dynamic reconfigure parameters ##
+################################################
+
 generate_dynamic_reconfigure_options(
   cfg/Controller.cfg
   cfg/LaneDetector.cfg
 )
 
-# Declare the catkin package
+###################################
+## catkin specific configuration ##
+###################################
+
 catkin_package(
   LIBRARIES lane_detector_nodelet
   CATKIN_DEPENDS nodelet roscpp
@@ -46,7 +57,12 @@ catkin_package(
 ## Specify additional locations of header files
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  include
 )
+
+#############
+## Arduino ##
+#############
 
 # Library generation for Arduino
 rosserial_generate_ros_lib(
@@ -62,6 +78,10 @@ rosserial_configure_client(
 )
 rosserial_add_client_target(arduino car_interface)
 rosserial_add_client_target(arduino car_interface-upload)
+
+###########
+## Build ##
+###########
 
 # Keyboard teleop executable
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)
@@ -96,3 +116,8 @@ target_link_libraries(controller ${catkin_LIBRARIES})
 # CarCommand to twist message converter executable
 add_executable(cmd_car_to_twist src/cmd_car_to_twist.cpp)
 target_link_libraries(cmd_car_to_twist ${catkin_LIBRARIES})
+
+#############
+## Testing ##
+#############
+
