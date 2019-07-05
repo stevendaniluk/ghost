@@ -7,15 +7,15 @@
   <maintainer email="stevendaniluk8@gmail.com">Steven Daniluk</maintainer>
   <license>BSD</license>
   <author email="stevendaniluk8@gmail.com">Steven Daniluk</author>
-  
+
   <!-- Declaration of nodelet plugin -->
   <export>
     <nodelet plugin="${prefix}/nodelet_plugins.xml" />
   </export>
-  
+
   <!-- Build Tool Dependencies -->
   <buildtool_depend>catkin</buildtool_depend>
-  
+
   <!-- Build Dependencies -->
   <build_depend>cv_bridge</build_depend>
   <build_depend>dynamic_reconfigure</build_depend>
@@ -30,7 +30,9 @@
   <build_depend>sensor_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>tf</build_depend>
-  
+  <build_depend>tf2</build_depend>
+  <build_depend>tf2_ros</build_depend>
+
   <!-- Run Time Dependencies -->
   <run_depend>cv_bridge</run_depend>
   <run_depend>dynamic_reconfigure</run_depend>
@@ -55,6 +57,8 @@
   <run_depend>sensor_msgs</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>tf</run_depend>
+  <run_depend>tf2</run_depend>
+  <run_depend>tf2_ros</run_depend>
   <run_depend>xacro</run_depend>
-  
+
 </package>

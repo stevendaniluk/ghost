@@ -18,6 +18,8 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   tf
+  tf2
+  tf2_ros
 )
 
 ################################################
@@ -89,6 +91,15 @@ add_library(car_odometry
 )
 target_link_libraries(car_odometry
   ${catkin_LIBRARIES}
+)
+
+# ROS odometry library
+add_library(car_odometry_ros
+  src/car_odometry_ros.cpp
+)
+target_link_libraries(car_odometry_ros
+  ${catkin_LIBRARIES}
+  car_odometry
 )
 
 # Keyboard teleop executable
