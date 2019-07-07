@@ -15,10 +15,10 @@
         type="serial_node.py"
         name="car_interface"
         output="screen" >
-        <rosparam
-            file="$(find ghost)/param/car_interface_params.yaml"
-            command="load"
-        />
+        <rosparam command="load">
+            port: /dev/ttyUSB0
+            baud: 115200
+        </rosparam>
     </node>
 
 </launch>
