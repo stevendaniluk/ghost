@@ -102,6 +102,14 @@ target_link_libraries(car_odometry_ros
   car_odometry
 )
 
+# Odometry node
+add_executable(car_odometry_node src/car_odometry_node.cpp)
+add_dependencies(car_odometry_node ${PROJECT_NAME}_generate_messages_cpp)
+target_link_libraries(car_odometry_node
+    ${catkin_LIBRARIES}
+    car_odometry_ros
+)
+
 # Keyboard teleop executable
 add_executable(teleop_keyboard src/teleop_keyboard.cpp)
 add_dependencies(teleop_keyboard ${PROJECT_NAME}_generate_messages_cpp)
