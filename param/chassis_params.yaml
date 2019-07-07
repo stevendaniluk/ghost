@@ -1,0 +1,14 @@
+# Parameters relating to physical aspects of the vehicle chassis or motion constraints
+chassis:
+    # Wheelbase
+    l: 0.260
+    # Measured wheel diameter [m]
+    d: 0.060
+    # Wheel diameter calibration coefficient
+    Cd: 1.03159
+    # Measured track with [m]
+    b: 0.162
+    # Track width calibration coefficient
+    Cb: 0.91723
+    # Max average steering angle between L and R wheels [degrees]
+    delta_max: 25.83

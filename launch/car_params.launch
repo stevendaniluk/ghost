@@ -1,0 +1,7 @@
+<!-- Loads common parameters related to the car -->
+
+<launch>
+
+    <rosparam command="load" file="$(find ghost)/param/chassis_params.yaml" />
+
+</launch>

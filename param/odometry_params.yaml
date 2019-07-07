@@ -1,0 +1,27 @@
+# Parameters relating to odometry integration
+#odometry:
+    # Input topic name with encoder data
+    control_state_topic: "control_state"
+    # Output topic name
+    odom_topic: "odometry_integrated"
+    # Frame ids to assign to messages and transforms
+    base_frame: "base_link"
+    world_frame: "odom"
+    # Flag for if the transform between the base frame and world frame should be broadcasted
+    broadcast_tf: true
+
+    # Covariance matrix diagonal entries for pose updates
+    pose_covariance_diagonal: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-3]
+    # Covariance matrix diagonal entries for velocity updates
+    twist_covariance_diagonal: [1e-3, 1e-5, 1e-6, 1e-6, 1e-6, 1e-2]
+    # Pulse count per revolution for front wheels
+    N_front: 24
+    # Pulse count per revolution for rear wheels
+    N_rear: 24
+    # Flags for which encoders should be used for estimating which state variables
+    # (disable the front axle for rotation estimate since the car has a one way diff
+    # in the front)
+    use_front_for_ds_update: true
+    use_rear_for_ds_update: true
+    use_front_for_dpsi_update: false
+    use_rear_for_dpsi_update: true

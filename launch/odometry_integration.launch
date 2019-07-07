@@ -1,0 +1,13 @@
+<!-- Starts the node for computing an integrated odometry estimate from encoder readings. -->
+
+<launch>
+
+    <node
+        pkg="ghost"
+        type="car_odometry_node"
+        name="odometry_integration"
+        output="screen" >
+        <rosparam command="load" file="$(find ghost)/param/odometry_params.yaml" />
+    </node>
+
+</launch>
