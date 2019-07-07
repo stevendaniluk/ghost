@@ -47,7 +47,8 @@ const SignalMap throttle_servo_map(58, 87, 132);
 const SignalMap steering_pwm_map(1020, 1485, 1965);
 const SignalMap throttle_pwm_map(1020, 1392, 1965);
 
-// Threshold PWM value for 3rd channel switch to trigger override mode
+// Threshold PWM value for 3rd channel switch to trigger override mode. On powerup the signal will
+// be ~1000.
 const uint16_t override_pwm_thresh = 1500;
 
 // Outgoing state message timing
@@ -222,7 +223,7 @@ void checkOverride() {
     // Disable the interrupts to record the latest override signal
     override_input.processNewSignalsNoInterrupts();
 
-    override_active = (override_input.pwm_local >= override_pwm_thresh);
+    override_active = (override_input.pwm_local <= override_pwm_thresh);
 
     // Attach/dettach the steering and throttle interrupts when needed
     if (override_active && !prev_override_active) {
