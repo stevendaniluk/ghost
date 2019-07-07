@@ -110,7 +110,7 @@ ros::Subscriber<ghost::CarControl> cmd_sub("cmd_car", cmdInCallback);
 
 // Setup Publishers
 ghost::ControlState state_msg;
-ros::Publisher state_pub("arduino_state", &state_msg);
+ros::Publisher state_pub("control_state", &state_msg);
 
 void setup() {
     nh.getHardware()->setBaud(115200);
