@@ -33,6 +33,7 @@ void controlStateCallback(const ghost::ControlState::ConstPtr& msg) {
         static_cast<int>(msg->RL_pulse_count), static_cast<int>(msg->RR_pulse_count)};
 
     odom->update(pulses, msg->car_control.steering, msg->header.stamp);
+    odom->broadcast();
 }
 
 int main(int argc, char** argv) {

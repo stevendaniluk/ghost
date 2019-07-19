@@ -51,23 +51,31 @@ class CarOdometryROS {
      */
     void update(const CarOdometry::Pulses& pulses, double steering, const ros::Time& time);
 
+    /* getState
+    *
+    * @return: Current odometry state
+    */
+    CarOdometry::State getState() const { return odometry_->getState(); }
+
+    /*broadcast
+    *
+    * Publishes the current odometry state and transform (if enabled).
+    */
+    void broadcast();
+
   protected:
     /* publishOdometry
      *
      * Publishes the current odometry state as an Odometry message.
-     *
-     * @param time: Time to stamp the message with
      */
-    void publishOdometry(const ros::Time& time);
+    void publishOdometry();
 
-    /* broadcastTF
+    /* publishTF
      *
      * Publishes a transform between the world frame and the base frame for the current odometry
      * state.
-     *
-     * @param time: Time to stamp the transform with
      */
-    void broadcastTF(const ros::Time& time);
+    void publishTF();
 
     // Parameters for this node
     Parameters params_;

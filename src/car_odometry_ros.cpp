@@ -1,5 +1,4 @@
 #include "car_odometry_ros.h"
-#include <tf2/LinearMath/Quaternion.h>
 #include <Eigen/Geometry>
 #include <boost/assign.hpp>
 
@@ -57,33 +56,35 @@ CarOdometryROS::CarOdometryROS(const ros::NodeHandle& nh,
 
 void CarOdometryROS::update(const CarOdometry::Pulses& pulses, double steering,
                             const ros::Time& time) {
-    if (!first_update_performed_) {
-        // This is the very first update, we need to record this input and wait for the next update
-        // to compute the state change
+    if (first_update_performed_) {
+        const double dt = (time - prev_update_time_).toSec();
+        prev_update_time_ = time;
+
+        const CarOdometry::Pulses rel_pulses = pulses - prev_pulses_;
+        prev_pulses_ = pulses;
+
+        odometry_->updateState(rel_pulses, steering, dt);
+    } else {
+        // Need to record this input and wait for the next update to actually compute the change in
+        // the state
         prev_update_time_ = time;
         prev_pulses_ = pulses;
         first_update_performed_ = true;
-        return;
-    }
-
-    const double dt = (time - prev_update_time_).toSec();
-    prev_update_time_ = time;
-
-    const CarOdometry::Pulses rel_pulses = pulses - prev_pulses_;
-    prev_pulses_ = pulses;
-
-    odometry_->updateState(rel_pulses, steering, dt);
-    publishOdometry(time);
-    if (params_.broadcast_tf) {
-        broadcastTF(time);
     }
 }
 
-void CarOdometryROS::publishOdometry(const ros::Time& time) {
+void CarOdometryROS::broadcast() {
+    publishOdometry();
+    if (params_.broadcast_tf) {
+        publishTF();
+    }
+}
+
+void CarOdometryROS::publishOdometry() {
     const CarOdometry::State& state = odometry_->getState();
 
-    odom_msg_.header.stamp = time;
-    odom_msg_.header.stamp = time;
+    odom_msg_.header.stamp = prev_update_time_;
+    odom_msg_.header.stamp = prev_update_time_;
     odom_msg_.pose.pose.position.x = state.position.x();
     odom_msg_.pose.pose.position.y = state.position.y();
     odom_msg_.twist.twist.linear.x = state.velocity;
@@ -99,10 +100,10 @@ void CarOdometryROS::publishOdometry(const ros::Time& time) {
     pub_odom_.publish(odom_msg_);
 }
 
-void CarOdometryROS::broadcastTF(const ros::Time& time) {
+void CarOdometryROS::publishTF() {
     const CarOdometry::State& state = odometry_->getState();
 
-    tf_msg_.header.stamp = ros::Time::now();
+    tf_msg_.header.stamp = prev_update_time_;
     tf_msg_.transform.translation.x = state.position.x();
     tf_msg_.transform.translation.y = state.position.y();
 

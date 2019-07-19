@@ -89,13 +89,13 @@ class CarOdometry {
      *
      * @return: Current vehicle state
      */
-    State getState() { return state_; }
+    State getState() const { return state_; }
 
     /* zeroState
      *
      * Resets all state variables to zero.
      */
-    void zeroState() { state_ = State(); }
+    void zeroState() { setState(State()); }
 
     /* updateState
      *

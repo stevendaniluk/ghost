@@ -2,8 +2,6 @@
 
 namespace ghost {
 
-// using CarOdometry;
-
 void CarOdometry::updateState(const Pulses& pulses, double steering, double dt) {
     const double ds = pulsesToTranslation(pulses, steering);
     const double dpsi = pulsesToRotation(pulses, steering);
