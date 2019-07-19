@@ -15,19 +15,18 @@ double CarOdometry::pulsesToTranslation(const Pulses& pulses, double steering) c
     }
 
     // Translation is the average of all four wheels
-    double ds_F = 0;
-    double ds_R = 0;
+    double revs_F = 0;
+    double revs_R = 0;
     if (params_.use_front_for_ds_update) {
         const double revs = (pulses.FL + pulses.FR) / (2.0 * params_.N_front);
         const double delta = steeringToWheelAngle(steering);
-        ds_F = ds_per_rev_ * revs * cos(delta);
+        revs_F = revs * cos(delta);
     }
     if (params_.use_rear_for_ds_update) {
-        const double revs = (pulses.RL + pulses.RR) / (2.0 * params_.N_rear);
-        ds_R = ds_per_rev_ * revs;
+        revs_R = (pulses.RL + pulses.RR) / (2.0 * params_.N_rear);
     }
 
-    const double ds = (ds_F + ds_R) / num_inputs;
+    const double ds = ds_per_rev_ * (revs_F + revs_R) / num_inputs;
     return ds;
 }
 
@@ -38,24 +37,27 @@ double CarOdometry::pulsesToRotation(const Pulses& pulses, double steering) cons
     }
 
     // Rotation is the average of all four wheels
-    double dpsi_F = 0;
-    double dpsi_R = 0;
+    double rev_diff_F = 0;
+    double rev_diff_R = 0;
     if (params_.use_front_for_dpsi_update) {
         const double rev_diff = static_cast<double>(pulses.FR - pulses.FL) / params_.N_front;
         const double delta = steeringToWheelAngle(steering);
-        dpsi_F = ds_per_rev_ * rev_diff / (b_eff_ * cos(delta));
+        rev_diff_F = rev_diff / cos(delta);
     }
     if (params_.use_rear_for_dpsi_update) {
-        const double rev_diff = static_cast<double>(pulses.RR - pulses.RL) / params_.N_front;
-        dpsi_R = ds_per_rev_ * rev_diff / b_eff_;
+        rev_diff_R = static_cast<double>(pulses.RR - pulses.RL) / params_.N_front;
     }
 
-    const double dpsi = (dpsi_F + dpsi_R) / num_inputs;
+    const double dpsi = ds_per_rev_ * (rev_diff_F + rev_diff_R) / (b_eff_ * num_inputs);
     return dpsi;
 }
 
 CarOdometry::State CarOdometry::integrateMotion(const State& init_state, double dt, double ds,
                                                 double dpsi) const {
+    if (dt == 0) {
+        return init_state;
+    }
+
     State new_state;
 
     // Update the state rates
