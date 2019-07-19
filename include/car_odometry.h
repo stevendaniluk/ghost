@@ -58,20 +58,14 @@ class CarOdometry {
 
     // Count of pulses for each wheel
     struct Pulses {
-        uint32_t FL;
-        uint32_t FR;
-        uint32_t RL;
-        uint32_t RR;
+        int FL;
+        int FR;
+        int RL;
+        int RR;
 
         // Note, the difference between two pulse counts will always be positive
         Pulses operator-(const Pulses& other) const {
-            Pulses result;
-            result.FL = (FL >= other.FL) ? (FL - other.FL) : (other.FL - FL);
-            result.FR = (FR >= other.FR) ? (FR - other.FR) : (other.FR - FR);
-            result.RL = (RL >= other.RL) ? (RL - other.RL) : (other.RL - RL);
-            result.RR = (RR >= other.RR) ? (RR - other.RR) : (other.RR - RR);
-
-            return result;
+            return Pulses{FL - other.FL, FR - other.FR, RL - other.RL, RR - other.RR};
         }
     };  // end Pulses
 

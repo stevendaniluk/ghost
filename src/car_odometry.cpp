@@ -43,22 +43,12 @@ double CarOdometry::pulsesToRotation(const Pulses& pulses, double steering) cons
     double dpsi_F = 0;
     double dpsi_R = 0;
     if (params_.use_front_for_dpsi_update) {
-        double rev_diff;
-        if (pulses.FR >= pulses.FL) {
-            rev_diff = static_cast<double>(pulses.FR - pulses.FL) / params_.N_front;
-        } else {
-            rev_diff = -static_cast<double>(pulses.FL - pulses.FR) / params_.N_front;
-        }
+        const double rev_diff = static_cast<double>(pulses.FR - pulses.FL) / params_.N_front;
         const double delta = steeringToWheelAngle(steering);
         dpsi_F = ds_per_rev_ * rev_diff / (b_eff_ * cos(delta));
     }
     if (params_.use_rear_for_dpsi_update) {
-        double rev_diff;
-        if (pulses.RR >= pulses.RL) {
-            rev_diff = static_cast<double>(pulses.RR - pulses.RL) / params_.N_front;
-        } else {
-            rev_diff = -static_cast<double>(pulses.RL - pulses.RR) / params_.N_front;
-        }
+        const double rev_diff = static_cast<double>(pulses.RR - pulses.RL) / params_.N_front;
         dpsi_R = ds_per_rev_ * rev_diff / b_eff_;
     }
 

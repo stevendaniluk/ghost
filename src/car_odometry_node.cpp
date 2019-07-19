@@ -28,8 +28,10 @@ std::vector<double> parseCovarianceParameter(const std::vector<std::string>& val
 
 void controlStateCallback(const ghost::ControlState::ConstPtr& msg) {
     // Feed the data into the odometry estimator
-    CarOdometry::Pulses pulses = {msg->FL_pulse_count, msg->FR_pulse_count, msg->RL_pulse_count,
-                                  msg->RR_pulse_count};
+    CarOdometry::Pulses pulses = {
+        static_cast<int>(msg->FL_pulse_count), static_cast<int>(msg->FR_pulse_count),
+        static_cast<int>(msg->RL_pulse_count), static_cast<int>(msg->RR_pulse_count)};
+
     odom->update(pulses, msg->car_control.steering, msg->header.stamp);
 }
 

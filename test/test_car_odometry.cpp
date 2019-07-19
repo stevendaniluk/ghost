@@ -37,7 +37,7 @@ TEST_F(CarOdometryTest, StateInitializedToZero) {
 }
 
 TEST_F(CarOdometryTest, EqualPulsesTranslationIsCorrect) {
-    uint32_t n = 15;
+    int n = 15;
     double ds_per_rev = params.d * params.Cd * M_PI;
     double ds_expected = ds_per_rev * n / params.N_front;
 
@@ -52,7 +52,7 @@ TEST_F(CarOdometryTest, TranslationScalesWithWheelAngle) {
     odometry.reset(new CarOdometry(params));
 
     // Get a baseline with zero wheel angle
-    uint32_t n = 15;
+    int n = 15;
     CarOdometry::Pulses pulses = {n, n, n, n};
     double ds_straight_wheel = odometry->pulsesToTranslation(pulses, 0);
 
@@ -67,9 +67,9 @@ TEST_F(CarOdometryTest, TranslationScalesWithWheelAngle) {
 }
 
 TEST_F(CarOdometryTest, TranslationIsMeanOfAllWheels) {
-    uint32_t n_low = 10;
-    uint32_t n_high = 20;
-    uint32_t n_avg = (n_low + n_high) / 2;
+    int n_low = 10;
+    int n_high = 20;
+    int n_avg = (n_low + n_high) / 2;
 
     // Put the high and low pulse counts on opposite corners
     CarOdometry::Pulses pulses_unequal = {n_low, n_high, n_high, n_low};
@@ -83,7 +83,7 @@ TEST_F(CarOdometryTest, TranslationIsMeanOfAllWheels) {
 }
 
 TEST_F(CarOdometryTest, EqualPulsesZeroRotation) {
-    uint32_t n = 15;
+    int n = 15;
     CarOdometry::Pulses pulses = {n, n, n, n};
     double dpsi = odometry->pulsesToRotation(pulses, 0);
     EXPECT_FLOAT_EQ(0.0, dpsi);
@@ -105,8 +105,8 @@ TEST_F(CarOdometryTest, HalfCircleRotationIsCorrect) {
     double ds_inner = M_PI * r_inner;
     double ds_outer = M_PI * r_outer;
 
-    uint32_t n_inner = params.N_rear * ds_inner / ds_per_rev;
-    uint32_t n_outer = params.N_rear * ds_outer / ds_per_rev;
+    int n_inner = params.N_rear * ds_inner / ds_per_rev;
+    int n_outer = params.N_rear * ds_outer / ds_per_rev;
 
     CarOdometry::Pulses pulses = {n_inner, n_outer, n_inner, n_outer};
 
@@ -116,8 +116,8 @@ TEST_F(CarOdometryTest, HalfCircleRotationIsCorrect) {
 }
 
 TEST_F(CarOdometryTest, RotationIsMeanOfFrontAndRear) {
-    uint32_t n_inner = 10;
-    uint32_t n_outer = 20;
+    int n_inner = 10;
+    int n_outer = 20;
 
     // Compute the rotation rate for a baseline
     CarOdometry::Pulses pulses = {n_inner, n_outer, n_inner, n_outer};
@@ -132,7 +132,7 @@ TEST_F(CarOdometryTest, RotationIsMeanOfFrontAndRear) {
 }
 
 TEST_F(CarOdometryTest, DisableInputsForTranslation) {
-    uint32_t n = 15;
+    int n = 15;
     CarOdometry::Pulses pulses_front_only = {n, n, 0, 0};
     CarOdometry::Pulses pulses_rear_only = {0, 0, n, n};
 
@@ -155,7 +155,7 @@ TEST_F(CarOdometryTest, DisableInputsForTranslation) {
 
 TEST_F(CarOdometryTest, DisableInputsForRotation) {
     // Make some pulses to make the vehicle turn left
-    uint32_t n = 15;
+    int n = 15;
     CarOdometry::Pulses pulses_front_only = {n, 2 * n, 0, 0};
     CarOdometry::Pulses pulses_rear_only = {0, 0, n, 2 * n};
 
